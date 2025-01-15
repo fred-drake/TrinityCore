@@ -26,13 +26,18 @@ EndScriptData */
 #include "AccountMgr.h"
 #include "CharacterCache.h"
 #include "Chat.h"
+#include "ChatCommand.h"
 #include "Language.h"
 #include "ObjectMgr.h"
 #include "Player.h"
-#include "Realm.h"
+#include "RealmList.h"
 #include "SupportMgr.h"
 #include "World.h"
 #include "WorldSession.h"
+
+#if TRINITY_COMPILER == TRINITY_COMPILER_GNU
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 class ticket_commandscript : public CommandScript
 {
@@ -127,7 +132,7 @@ bool ticket_commandscript::HandleTicketAssignToCommand(ChatHandler* handler, cha
     ObjectGuid targetGuid = sCharacterCache->GetCharacterGuidByName(target);
     uint32 accountId = sCharacterCache->GetCharacterAccountIdByGuid(targetGuid);
     // Target must exist and have administrative rights
-    if (!AccountMgr::HasPermission(accountId, rbac::RBAC_PERM_COMMANDS_BE_ASSIGNED_TICKET, realm.Id.Realm))
+    if (!AccountMgr::HasPermission(accountId, rbac::RBAC_PERM_COMMANDS_BE_ASSIGNED_TICKET, sRealmList->GetCurrentRealmId().Realm))
     {
         handler->SendSysMessage(LANG_COMMAND_TICKETASSIGNERROR_A);
         return true;
@@ -158,8 +163,6 @@ bool ticket_commandscript::HandleTicketAssignToCommand(ChatHandler* handler, cha
     handler->SendGlobalGMSysMessage(msg.c_str());
     return true;
 }
-
-
 
 template<typename T>
 bool ticket_commandscript::HandleTicketCloseByIdCommand(ChatHandler* handler, char const* args)
@@ -280,7 +283,6 @@ bool ticket_commandscript::HandleTicketDeleteByIdCommand(ChatHandler* handler, c
     return true;
 }
 
-
 template<typename T>
 bool ticket_commandscript::HandleTicketResetCommand(ChatHandler* handler, char const* /*args*/)
 {
@@ -326,7 +328,7 @@ bool ticket_commandscript::HandleTicketUnAssignCommand(ChatHandler* handler, cha
     {
         ObjectGuid guid = ticket->GetAssignedToGUID();
         uint32 accountId = sCharacterCache->GetCharacterAccountIdByGuid(guid);
-        security = AccountMgr::GetSecurity(accountId, realm.Id.Realm);
+        security = AccountMgr::GetSecurity(accountId, sRealmList->GetCurrentRealmId().Realm);
     }
 
     // Check security

@@ -110,7 +110,8 @@ class boss_grand_warlock_nethekurse : public CreatureScript
             void Reset() override
             {
                 _Reset();
-                me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                me->SetCanMelee(true);
 
                 Initialize();
             }
@@ -207,10 +208,6 @@ class boss_grand_warlock_nethekurse : public CreatureScript
 
             void JustSummoned(Creature* summoned) override
             {
-                summoned->SetFaction(FACTION_MONSTER_2);
-                summoned->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
-                summoned->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
-
                 //triggered spell of consumption does not properly show it's SpellVisual, wrong spellid?
                 summoned->CastSpell(summoned, SPELL_TEMPORARY_VISUAL, true);
                 summoned->CastSpell(summoned, SPELL_CONSUMPTION, CastSpellExtraArgs().SetOriginalCaster(me->GetGUID()));
@@ -277,9 +274,10 @@ class boss_grand_warlock_nethekurse : public CreatureScript
                         DeathCoil_Timer -= diff;
 
                     if (!HealthAbovePct(20))
+                    {
                         Phase = true;
-
-                    DoMeleeAttackIfReady();
+                        me->SetCanMelee(false);
+                    }
                 }
             }
 
@@ -357,8 +355,6 @@ class npc_fel_orc_convert : public CreatureScript
                     DoCastVictim(SPELL_HEMORRHAGE);
                     events.ScheduleEvent(EVENT_HEMORRHAGE, 15s);
                 }
-
-                DoMeleeAttackIfReady();
             }
 
             private:

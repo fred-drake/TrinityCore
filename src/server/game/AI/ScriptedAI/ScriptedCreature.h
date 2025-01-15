@@ -21,6 +21,7 @@
 #include "CreatureAI.h"
 #include "Creature.h"  // convenience include for scripts, all uses of ScriptedCreature also need Creature (except ScriptedCreature itself doesn't need Creature)
 #include "DBCEnums.h"
+#include "EventMap.h"
 #include "TaskScheduler.h"
 
 class InstanceScript;
@@ -97,9 +98,9 @@ public:
     void DoAction(int32 info, Predicate&& predicate, uint16 max = 0)
     {
         // We need to use a copy of SummonList here, otherwise original SummonList would be modified
-        StorageType listCopy = _storage;
-        Trinity::Containers::RandomResize<StorageType, Predicate>(listCopy, std::forward<Predicate>(predicate), max);
-        DoActionImpl(info, listCopy);
+        StorageType listCopy;
+        std::copy_if(std::begin(_storage), std::end(_storage), std::inserter(listCopy, std::end(listCopy)), predicate);
+        DoActionImpl(info, listCopy, max);
     }
 
     void DoZoneInCombat(uint32 entry = 0);
@@ -107,7 +108,7 @@ public:
     bool HasEntry(uint32 entry) const;
 
 private:
-    void DoActionImpl(int32 action, StorageType const& summons);
+    void DoActionImpl(int32 action, StorageType& summons, uint16 max);
 
     Creature* _me;
     StorageType _storage;
@@ -236,12 +237,13 @@ struct TC_GAME_API ScriptedAI : public CreatureAI
         void SetCombatMovement(bool allowMovement);
         bool IsCombatMovementAllowed() const { return _isCombatMovementAllowed; }
 
-        // return true for heroic mode. i.e.
-        //   - for dungeon in mode 10-heroic,
-        //   - for raid in mode 10-Heroic
-        //   - for raid in mode 25-heroic
-        // DO NOT USE to check raid in mode 25-normal.
-        bool IsHeroic() const { return _isHeroic; }
+        bool IsLFR() const;
+        bool IsNormal() const;
+        bool IsHeroic() const;
+        bool IsMythic() const;
+        bool IsMythicPlus() const;
+        bool IsHeroicOrHigher() const;
+        bool IsTimewalking() const;
 
         // return the dungeon or raid difficulty
         Difficulty GetDifficulty() const { return _difficulty; }
@@ -304,7 +306,6 @@ struct TC_GAME_API ScriptedAI : public CreatureAI
     private:
         Difficulty _difficulty;
         bool _isCombatMovementAllowed;
-        bool _isHeroic;
 };
 
 class TC_GAME_API BossAI : public ScriptedAI
@@ -334,6 +335,8 @@ class TC_GAME_API BossAI : public ScriptedAI
         void JustReachedHome() override { _JustReachedHome(); }
 
         bool CanAIAttack(Unit const* target) const override;
+
+        uint32 GetBossId() const { return _bossId; }
 
     protected:
         void _Reset();
@@ -388,9 +391,14 @@ inline Creature* GetClosestCreatureWithEntry(WorldObject* source, uint32 entry, 
     return source->FindNearestCreature(entry, maxSearchRange, alive);
 }
 
-inline GameObject* GetClosestGameObjectWithEntry(WorldObject* source, uint32 entry, float maxSearchRange)
+inline Creature* GetClosestCreatureWithOptions(WorldObject* source, float maxSearchRange, FindCreatureOptions const& options)
 {
-    return source->FindNearestGameObject(entry, maxSearchRange);
+    return source->FindNearestCreatureWithOptions(maxSearchRange, options);
+}
+
+inline GameObject* GetClosestGameObjectWithEntry(WorldObject* source, uint32 entry, float maxSearchRange, bool spawnedOnly = true)
+{
+    return source->FindNearestGameObject(entry, maxSearchRange, spawnedOnly);
 }
 
 template <typename Container>
@@ -400,15 +408,21 @@ inline void GetCreatureListWithEntryInGrid(Container& container, WorldObject* so
 }
 
 template <typename Container>
+inline void GetCreatureListWithOptionsInGrid(Container& container, WorldObject* source, float maxSearchRange, FindCreatureOptions const& options)
+{
+    source->GetCreatureListWithOptionsInGrid(container, maxSearchRange, options);
+}
+
+template <typename Container>
 inline void GetGameObjectListWithEntryInGrid(Container& container, WorldObject* source, uint32 entry, float maxSearchRange)
 {
     source->GetGameObjectListWithEntryInGrid(container, entry, maxSearchRange);
 }
 
 template <typename Container>
-inline void GetPlayerListInGrid(Container& container, WorldObject* source, float maxSearchRange)
+inline void GetPlayerListInGrid(Container& container, WorldObject* source, float maxSearchRange, bool alive = true)
 {
-    source->GetPlayerListInGrid(container, maxSearchRange);
+    source->GetPlayerListInGrid(container, maxSearchRange, alive);
 }
 
 #endif // TRINITY_SCRIPTEDCREATURE_H

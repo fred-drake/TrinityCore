@@ -68,7 +68,7 @@ struct boss_golemagg : public BossAI
         events.ScheduleEvent(EVENT_PYROBLAST, 7s);
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
+    void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (!HealthBelowPct(10) || me->HasAura(SPELL_ENRAGE))
             return;
@@ -107,8 +107,6 @@ struct boss_golemagg : public BossAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        DoMeleeAttackIfReady();
     }
 };
 
@@ -133,7 +131,7 @@ struct npc_core_rager : public ScriptedAI
         });
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
+    void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (HealthAbovePct(50) || !_instance)
             return;
@@ -154,10 +152,7 @@ struct npc_core_rager : public ScriptedAI
         if (!UpdateVictim())
             return;
 
-        _scheduler.Update(diff, [this]
-        {
-            DoMeleeAttackIfReady();
-        });
+        _scheduler.Update(diff);
     }
 
 private:

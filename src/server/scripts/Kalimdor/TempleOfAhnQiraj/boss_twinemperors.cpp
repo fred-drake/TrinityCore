@@ -25,7 +25,6 @@ EndScriptData */
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
 #include "MotionMaster.h"
-#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "SpellInfo.h"
 #include "temple_of_ahnqiraj.h"
@@ -57,11 +56,12 @@ enum Sound
 
 enum Misc
 {
-    PULL_RANGE                    = 50,
     ABUSE_BUG_RANGE               = 20,
     VEKLOR_DIST                   = 20,                      // VL will not come to melee when attacking
     TELEPORTTIME                  = 30000
 };
+
+static constexpr float PULL_RANGE = 50.0f;
 
 struct boss_twinemperorsAI : public BossAI
 {
@@ -109,7 +109,7 @@ struct boss_twinemperorsAI : public BossAI
         return instance->GetCreature(IAmVeklor() ? DATA_VEKNILASH : DATA_VEKLOR);
     }
 
-    void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+    void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         Unit* pOtherBoss = GetOtherBoss();
         if (pOtherBoss)
@@ -121,7 +121,7 @@ struct boss_twinemperorsAI : public BossAI
             if (ohealth <= 0)
             {
                 pOtherBoss->setDeathState(JUST_DIED);
-                pOtherBoss->AddDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+                pOtherBoss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
             }
         }
     }
@@ -133,7 +133,7 @@ struct boss_twinemperorsAI : public BossAI
         {
             pOtherBoss->SetHealth(0);
             pOtherBoss->setDeathState(JUST_DIED);
-            pOtherBoss->AddDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+            pOtherBoss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
             ENSURE_AI(boss_twinemperorsAI, pOtherBoss->AI())->DontYellWhenDead = true;
         }
         if (!DontYellWhenDead)                              // I hope AI is not threaded
@@ -422,8 +422,6 @@ public:
         {
             TwinReset();
             Initialize();
-                                                                //Added. Can be removed if its included in DB.
-            me->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_MAGIC, true);
         }
 
         void CastSpellOnBug(Creature* target) override
@@ -470,8 +468,6 @@ public:
             } else Teleport_Timer -= diff;
 
             CheckEnrage(diff);
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -512,9 +508,6 @@ public:
         {
             TwinReset();
             Initialize();
-
-            //Added. Can be removed if its included in DB.
-            me->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, true);
         }
 
         void CastSpellOnBug(Creature* target) override

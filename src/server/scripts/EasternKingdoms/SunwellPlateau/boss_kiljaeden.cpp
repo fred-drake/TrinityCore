@@ -264,7 +264,7 @@ public:
         {
             Initialize();
             me->SetDisableGravity(true);
-            me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+            me->SetUninteractible(true);
             me->setActive(true);
             me->SetFarVisible(true);
 
@@ -379,7 +379,7 @@ class go_orb_of_the_blue_flight : public GameObjectScript
 
             InstanceScript* instance;
 
-            bool GossipHello(Player* player) override
+            bool OnGossipHello(Player* player) override
             {
                 if (me->GetFaction() == FACTION_FRIENDLY)
                 {
@@ -444,8 +444,8 @@ public:
 
         void InitializeAI() override
         {
-            me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
-            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUninteractible(true);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->AddUnitState(UNIT_STATE_STUNNED);
 
             ScriptedAI::InitializeAI();
@@ -468,9 +468,7 @@ public:
                     summoned->CastSpell(summoned, SPELL_SHADOW_CHANNELING, false);
                     break;
                 case NPC_ANVEENA:
-                    summoned->SetDisableGravity(true);
                     summoned->CastSpell(summoned, SPELL_ANVEENA_PRISON, true);
-                    summoned->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                     break;
                 case NPC_KILJAEDEN:
                     summoned->CastSpell(summoned, SPELL_REBIRTH, false);
@@ -619,8 +617,8 @@ public:
         {
             if (summoned->GetEntry() == NPC_ARMAGEDDON_TARGET)
             {
-                summoned->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
-                summoned->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                summoned->SetUninteractible(true);
+                summoned->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         //      summoned->SetVisibility(VISIBILITY_OFF);  //with this we cant see the armageddon visuals
             }
             else
@@ -866,7 +864,6 @@ public:
                      }
                 }
             }
-            DoMeleeAttackIfReady();
             //Time runs over!
             for (uint8 i = 0; i < ActiveTimers; ++i)
                 if (!TimerIsDeactivated[i])
@@ -1000,8 +997,6 @@ public:
                         AddThreat(ref->GetVictim(), 1.0f, pPortal);
                 FelfirePortalTimer = 20000;
             } else FelfirePortalTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -1040,7 +1035,8 @@ public:
         void Reset() override
         {
             Initialize();
-            me->AddUnitFlag(UnitFlags(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE));
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUninteractible(true);
         }
 
         void JustSummoned(Creature* summoned) override
@@ -1097,7 +1093,7 @@ public:
             Initialize();
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             if (damage > me->GetHealth())
                 DoCast(me, SPELL_FELFIRE_FISSION, true);
@@ -1362,7 +1358,6 @@ public:
                         DoCastVictim(SPELL_SR_MOONFIRE, false);
                         uiTimer[1] = urand(2000, 4000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_HUNTER:
                     if (uiTimer[1] <= diff)
@@ -1382,7 +1377,6 @@ public:
                             DoCastVictim(SPELL_SR_MULTI_SHOT, false);
                             uiTimer[0] = urand(6000, 8000);
                         }
-                        DoMeleeAttackIfReady();
                     }
                     break;
                 case CLASS_MAGE:
@@ -1391,7 +1385,6 @@ public:
                         DoCastVictim(SPELL_SR_FIREBALL, false);
                         uiTimer[1] = urand(2000, 4000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_WARLOCK:
                     if (uiTimer[1] <= diff)
@@ -1404,7 +1397,6 @@ public:
                         DoCast(SelectTarget(SelectTargetMethod::Random, 0, 100, true), SPELL_SR_CURSE_OF_AGONY, true);
                         uiTimer[2] = urand(2000, 4000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_WARRIOR:
                     if (uiTimer[1] <= diff)
@@ -1412,7 +1404,6 @@ public:
                         DoCastVictim(SPELL_SR_WHIRLWIND, false);
                         uiTimer[1] = urand(9000, 11000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_PALADIN:
                     if (uiTimer[1] <= diff)
@@ -1425,7 +1416,6 @@ public:
                         DoCastVictim(SPELL_SR_HOLY_SHOCK, false);
                         uiTimer[2] = urand(2000, 4000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_PRIEST:
                     if (uiTimer[1] <= diff)
@@ -1438,7 +1428,6 @@ public:
                         DoCast(me, SPELL_SR_RENEW, false);
                         uiTimer[2] = urand(6000, 8000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_SHAMAN:
                     if (uiTimer[1] <= diff)
@@ -1446,7 +1435,6 @@ public:
                         DoCastVictim(SPELL_SR_EARTH_SHOCK, false);
                         uiTimer[1] = urand(4000, 6000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
                 case CLASS_ROGUE:
                     if (uiTimer[1] <= diff)
@@ -1454,7 +1442,6 @@ public:
                         DoCastVictim(SPELL_SR_HEMORRHAGE, true);
                         uiTimer[1] = urand(4000, 6000);
                     }
-                    DoMeleeAttackIfReady();
                     break;
             }
             TC_LOG_DEBUG("scripts", "Sinister-Timer");

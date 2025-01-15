@@ -18,7 +18,7 @@
 #ifndef Types_h__
 #define Types_h__
 
-#include "advstd.h"
+#include <type_traits>
 
 namespace Trinity
 {
@@ -35,7 +35,7 @@ namespace Trinity
     };
 
     template<template<typename...> typename Check, typename T1, typename... Ts>
-    struct find_type_if<Check, T1, Ts...> : std::conditional_t<Check<T1>::value, advstd::type_identity<T1>, find_type_if<Check, Ts...>>
+    struct find_type_if<Check, T1, Ts...> : std::conditional_t<Check<T1>::value, std::type_identity<T1>, find_type_if<Check, Ts...>>
     {
     };
 
@@ -63,6 +63,12 @@ namespace Trinity
     */
     template<template<typename...> typename Check, typename... Ts>
     using find_type_if_t = typename find_type_if<Check, Ts...>::type;
+
+    template <typename T>
+    struct dependant_false { static constexpr bool value = false; };
+
+    template <typename T>
+    constexpr bool dependant_false_v = dependant_false<T>::value;
 }
 
 #endif // Types_h__

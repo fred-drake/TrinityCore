@@ -24,7 +24,6 @@ EndScriptData */
 
 #include "ScriptMgr.h"
 #include "molten_core.h"
-#include "ObjectMgr.h"
 #include "ScriptedCreature.h"
 
 enum Spells
@@ -86,8 +85,6 @@ struct boss_garr : public BossAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        DoMeleeAttackIfReady();
     }
 };
 
@@ -129,7 +126,7 @@ struct npc_firesworn : public ScriptedAI
         ScheduleTasks();
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& damage) override
+    void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         uint32 const health10pct = me->CountPctFromMaxHealth(10);
         uint32 health = me->GetHealth();
@@ -146,8 +143,7 @@ struct npc_firesworn : public ScriptedAI
         if (!UpdateVictim())
             return;
 
-        _scheduler.Update(diff,
-            std::bind(&ScriptedAI::DoMeleeAttackIfReady, this));
+        _scheduler.Update(diff);
     }
 
 private:

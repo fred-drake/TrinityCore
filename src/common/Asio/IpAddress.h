@@ -25,21 +25,11 @@ namespace Trinity
 {
     namespace Net
     {
-#if BOOST_VERSION >= 106600
         using boost::asio::ip::make_address;
         using boost::asio::ip::make_address_v4;
+        using boost::asio::ip::make_address_v6;
+        using boost::asio::ip::v4_mapped_t::v4_mapped;
         inline uint32 address_to_uint(boost::asio::ip::address_v4 const& address) { return address.to_uint(); }
-#else
-        inline boost::asio::ip::address make_address(char const* str) { return boost::asio::ip::address::from_string(str); }
-        inline boost::asio::ip::address make_address(char const* str, boost::system::error_code& ec) { return boost::asio::ip::address::from_string(str, ec); }
-        inline boost::asio::ip::address make_address(std::string const& str) { return boost::asio::ip::address::from_string(str); }
-        inline boost::asio::ip::address make_address(std::string const& str, boost::system::error_code& ec) { return boost::asio::ip::address::from_string(str, ec); }
-        inline boost::asio::ip::address_v4 make_address_v4(char const* str) { return boost::asio::ip::address_v4::from_string(str); }
-        inline boost::asio::ip::address_v4 make_address_v4(char const* str, boost::system::error_code& ec) { return boost::asio::ip::address_v4::from_string(str, ec); }
-        inline boost::asio::ip::address_v4 make_address_v4(std::string const& str) { return boost::asio::ip::address_v4::from_string(str); }
-        inline boost::asio::ip::address_v4 make_address_v4(std::string const& str, boost::system::error_code& ec) { return boost::asio::ip::address_v4::from_string(str, ec); }
-        inline uint32 address_to_uint(boost::asio::ip::address_v4 const& address) { return address.to_ulong(); }
-#endif
     }
 }
 

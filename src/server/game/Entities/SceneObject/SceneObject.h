@@ -19,6 +19,7 @@
 #define SceneObject_h__
 
 #include "Object.h"
+#include "GridObject.h"
 
 struct SceneTemplate;
 
@@ -28,20 +29,31 @@ enum class SceneType : uint32
     PetBattle   = 1
 };
 
-class TC_GAME_API SceneObject : public WorldObject, public GridObject<SceneObject>
+class TC_GAME_API SceneObject final : public WorldObject, public GridObject<SceneObject>
 {
 public:
     SceneObject();
     ~SceneObject();
 
 protected:
-    void BuildValuesCreate(ByteBuffer* data, Player const* target) const override;
-    void BuildValuesUpdate(ByteBuffer* data, Player const* target) const override;
+    void BuildValuesCreate(ByteBuffer* data, UF::UpdateFieldFlag flags, Player const* target) const override;
+    void BuildValuesUpdate(ByteBuffer* data, UF::UpdateFieldFlag flags, Player const* target) const override;
     void ClearUpdateMask(bool remove) override;
 
 public:
     void BuildValuesUpdateForPlayerWithMask(UpdateData* data, UF::ObjectData::Mask const& requestedObjectMask,
         UF::SceneObjectData::Mask const& requestedSceneObjectMask, Player const* target) const;
+
+    struct ValuesUpdateForPlayerWithMaskSender // sender compatible with MessageDistDeliverer
+    {
+        explicit ValuesUpdateForPlayerWithMaskSender(SceneObject const* owner) : Owner(owner) { }
+
+        SceneObject const* Owner;
+        UF::ObjectData::Base ObjectMask;
+        UF::SceneObjectData::Base SceneObjectMask;
+
+        void operator()(Player const* player) const;
+    };
 
     void AddToWorld() override;
     void RemoveFromWorld() override;
@@ -53,6 +65,7 @@ public:
     bool Create(ObjectGuid::LowType lowGuid, SceneType type, uint32 sceneId, uint32 scriptPackageId, Map* map, Unit* creator,
         Position const& pos, ObjectGuid privateObjectOwner);
 
+    ObjectGuid GetCreatorGUID() const override { return *m_sceneObjectData->CreatedBy; }
     ObjectGuid GetOwnerGUID() const override { return *m_sceneObjectData->CreatedBy; }
     uint32 GetFaction() const override { return 0; }
 
@@ -64,7 +77,7 @@ public:
 
     void SetCreatedBySpellCast(ObjectGuid castId) { _createdBySpellCast = castId; }
 
-    UF::UpdateField<UF::SceneObjectData, 0, TYPEID_SCENEOBJECT> m_sceneObjectData;
+    UF::UpdateField<UF::SceneObjectData, int32(WowCS::EntityFragment::CGObject), TYPEID_SCENEOBJECT> m_sceneObjectData;
 
 private:
     bool ShouldBeRemoved() const;

@@ -25,17 +25,42 @@
 void WorldPackets::Chat::ChatMessage::Read()
 {
     _worldPacket >> Language;
-    uint32 len = _worldPacket.ReadBits(9);
+    uint32 len = _worldPacket.ReadBits(11);
+    switch (GetOpcode())
+    {
+        case CMSG_CHAT_MESSAGE_SAY:
+        case CMSG_CHAT_MESSAGE_PARTY:
+        case CMSG_CHAT_MESSAGE_RAID:
+        case CMSG_CHAT_MESSAGE_RAID_WARNING:
+        case CMSG_CHAT_MESSAGE_INSTANCE_CHAT:
+            IsSecure = _worldPacket.ReadBit();
+            break;
+        default:
+            break;
+    }
     Text = _worldPacket.ReadString(len);
 }
 
 void WorldPackets::Chat::ChatMessageWhisper::Read()
 {
     _worldPacket >> Language;
+    _worldPacket >> TargetGUID;
+    _worldPacket >> TargetVirtualRealmAddress;
+
     uint32 targetLen = _worldPacket.ReadBits(9);
-    uint32 textLen = _worldPacket.ReadBits(9);
-    Target = _worldPacket.ReadString(targetLen);
-    Text = _worldPacket.ReadString(textLen);
+    uint32 textLen = _worldPacket.ReadBits(11);
+
+    if (targetLen > 1)
+    {
+        Target = _worldPacket.ReadString(targetLen - 1);
+        _worldPacket.read_skip<uint8>(); // null terminator
+    }
+
+    if (textLen > 1)
+    {
+        Text = _worldPacket.ReadString(textLen - 1);
+        _worldPacket.read_skip<uint8>(); // null terminator
+    }
 }
 
 void WorldPackets::Chat::ChatMessageChannel::Read()
@@ -43,7 +68,10 @@ void WorldPackets::Chat::ChatMessageChannel::Read()
     _worldPacket >> Language;
     _worldPacket >> ChannelGUID;
     uint32 targetLen = _worldPacket.ReadBits(9);
-    uint32 textLen = _worldPacket.ReadBits(9);
+    uint32 textLen = _worldPacket.ReadBits(11);
+    if (_worldPacket.ReadBit())
+        IsSecure = _worldPacket.ReadBit();
+
     Target = _worldPacket.ReadString(targetLen);
     Text = _worldPacket.ReadString(textLen);
 }
@@ -67,51 +95,63 @@ void WorldPackets::Chat::ChatAddonMessage::Read()
 
 void WorldPackets::Chat::ChatAddonMessageTargeted::Read()
 {
-    uint32 targetLen = _worldPacket.ReadBits(9);
-    _worldPacket.ResetBitPos();
-
     _worldPacket >> Params;
-    _worldPacket >> *ChannelGUID;
-    Target = _worldPacket.ReadString(targetLen);
+    _worldPacket >> ChannelGUID;
+    _worldPacket >> PlayerGUID;
+    _worldPacket >> PlayerVirtualRealmAddress;
+
+    uint32 playerNameLength = _worldPacket.ReadBits(9);
+    uint32 channelNameLength = _worldPacket.ReadBits(8);
+
+    if (playerNameLength > 1)
+    {
+        PlayerName = _worldPacket.ReadString(playerNameLength - 1);
+        _worldPacket.read_skip<uint8>(); // null terminator
+    }
+
+    if (channelNameLength > 1)
+    {
+        ChannelName = _worldPacket.ReadString(channelNameLength - 1);
+        _worldPacket.read_skip<uint8>(); // null terminator
+    }
 }
 
 void WorldPackets::Chat::ChatMessageDND::Read()
 {
-    uint32 len = _worldPacket.ReadBits(9);
+    uint32 len = _worldPacket.ReadBits(11);
     Text = _worldPacket.ReadString(len);
 }
 
 void WorldPackets::Chat::ChatMessageAFK::Read()
 {
-    uint32 len = _worldPacket.ReadBits(9);
+    uint32 len = _worldPacket.ReadBits(11);
     Text = _worldPacket.ReadString(len);
 }
 
 void WorldPackets::Chat::ChatMessageEmote::Read()
 {
-    uint32 len = _worldPacket.ReadBits(9);
+    uint32 len = _worldPacket.ReadBits(11);
     Text = _worldPacket.ReadString(len);
 }
 
 WorldPackets::Chat::Chat::Chat(Chat const& chat) : ServerPacket(SMSG_CHAT, chat._worldPacket.size()),
     SlashCmd(chat.SlashCmd), _Language(chat._Language), SenderGUID(chat.SenderGUID),
-    SenderGuildGUID(chat.SenderGuildGUID), SenderAccountGUID(chat.SenderAccountGUID), TargetGUID(chat.TargetGUID), PartyGUID(chat.PartyGUID),
+    SenderGuildGUID(chat.SenderGuildGUID), SenderWowAccount(chat.SenderWowAccount), TargetGUID(chat.TargetGUID),
     SenderVirtualAddress(chat.SenderVirtualAddress), TargetVirtualAddress(chat.TargetVirtualAddress), SenderName(chat.SenderName), TargetName(chat.TargetName),
     Prefix(chat.Prefix), _Channel(chat._Channel), ChatText(chat.ChatText), AchievementID(chat.AchievementID), _ChatFlags(chat._ChatFlags),
     DisplayTime(chat.DisplayTime), HideChatLog(chat.HideChatLog), FakeSenderName(chat.FakeSenderName)
 {
 }
 
-void WorldPackets::Chat::Chat::Initialize(ChatMsg chatType, Language language, WorldObject const* sender, WorldObject const* receiver, std::string message,
-    uint32 achievementId /*= 0*/, std::string channelName /*= ""*/, LocaleConstant locale /*= DEFAULT_LOCALE*/, std::string addonPrefix /*= ""*/)
+void WorldPackets::Chat::Chat::Initialize(ChatMsg chatType, Language language, WorldObject const* sender, WorldObject const* receiver, std::string_view message,
+    uint32 achievementId /*= 0*/, std::string_view channelName /*= ""*/, LocaleConstant locale /*= DEFAULT_LOCALE*/, std::string_view addonPrefix /*= ""*/)
 {
     // Clear everything because same packet can be used multiple times
     Clear();
 
     SenderGUID.Clear();
-    SenderAccountGUID.Clear();
+    SenderWowAccount.Clear();
     SenderGuildGUID.Clear();
-    PartyGUID.Clear();
     TargetGUID.Clear();
     SenderName.clear();
     TargetName.clear();
@@ -129,9 +169,9 @@ void WorldPackets::Chat::Chat::Initialize(ChatMsg chatType, Language language, W
     SenderVirtualAddress = GetVirtualRealmAddress();
     TargetVirtualAddress = GetVirtualRealmAddress();
     AchievementID = achievementId;
-    _Channel = std::move(channelName);
-    Prefix = std::move(addonPrefix);
-    ChatText = std::move(message);
+    _Channel = channelName;
+    Prefix = addonPrefix;
+    ChatText = message;
 }
 
 void WorldPackets::Chat::Chat::SetSender(WorldObject const* sender, LocaleConstant locale)
@@ -143,13 +183,10 @@ void WorldPackets::Chat::Chat::SetSender(WorldObject const* sender, LocaleConsta
 
     if (Player const* playerSender = sender->ToPlayer())
     {
-        SenderAccountGUID = playerSender->GetSession()->GetAccountGUID();
+        SenderWowAccount = playerSender->GetSession()->GetAccountGUID();
         _ChatFlags = playerSender->GetChatFlags();
 
         SenderGuildGUID = ObjectGuid::Create<HighGuid::Guild>(playerSender->GetGuildId());
-
-        if (Group const* group = playerSender->GetGroup())
-            PartyGUID = group->GetGUID();
     }
 }
 
@@ -166,22 +203,22 @@ WorldPacket const* WorldPackets::Chat::Chat::Write()
     _worldPacket << uint32(_Language);
     _worldPacket << SenderGUID;
     _worldPacket << SenderGuildGUID;
-    _worldPacket << SenderAccountGUID;
+    _worldPacket << SenderWowAccount;
     _worldPacket << TargetGUID;
     _worldPacket << uint32(TargetVirtualAddress);
     _worldPacket << uint32(SenderVirtualAddress);
-    _worldPacket << PartyGUID;
-    _worldPacket << uint32(AchievementID);
+    _worldPacket << int32(AchievementID);
+    _worldPacket << uint16(_ChatFlags);
     _worldPacket << float(DisplayTime);
+    _worldPacket << int32(SpellID);
     _worldPacket.WriteBits(SenderName.length(), 11);
     _worldPacket.WriteBits(TargetName.length(), 11);
     _worldPacket.WriteBits(Prefix.length(), 5);
     _worldPacket.WriteBits(_Channel.length(), 7);
     _worldPacket.WriteBits(ChatText.length(), 12);
-    _worldPacket.WriteBits(_ChatFlags, 14);
     _worldPacket.WriteBit(HideChatLog);
     _worldPacket.WriteBit(FakeSenderName);
-    _worldPacket.WriteBit(Unused_801.has_value());
+    _worldPacket.WriteBit(BroadcastTextID.has_value());
     _worldPacket.WriteBit(ChannelGUID.has_value());
     _worldPacket.FlushBits();
 
@@ -191,8 +228,8 @@ WorldPacket const* WorldPackets::Chat::Chat::Write()
     _worldPacket.WriteString(_Channel);
     _worldPacket.WriteString(ChatText);
 
-    if (Unused_801)
-        _worldPacket << uint32(*Unused_801);
+    if (BroadcastTextID)
+        _worldPacket << uint32(*BroadcastTextID);
 
     if (ChannelGUID)
         _worldPacket << *ChannelGUID;
@@ -205,6 +242,7 @@ WorldPacket const* WorldPackets::Chat::Emote::Write()
     _worldPacket << Guid;
     _worldPacket << uint32(EmoteID);
     _worldPacket << uint32(SpellVisualKitIDs.size());
+    _worldPacket << int32(SequenceVariation);
     if (!SpellVisualKitIDs.empty())
         _worldPacket.append(SpellVisualKitIDs.data(), SpellVisualKitIDs.size());
 
@@ -217,6 +255,7 @@ void WorldPackets::Chat::CTextEmote::Read()
     _worldPacket >> EmoteID;
     _worldPacket >> SoundIndex;
     SpellVisualKitIDs.resize(_worldPacket.read<uint32>());
+    _worldPacket >> SequenceVariation;
     for (int32& spellVisualKitId : SpellVisualKitIDs)
         _worldPacket >> spellVisualKitId;
 }
@@ -297,7 +336,34 @@ WorldPacket const* WorldPackets::Chat::ChatPlayerAmbiguous::Write()
 
 WorldPacket const* WorldPackets::Chat::ChatRestricted::Write()
 {
-    _worldPacket << uint8(Reason);
+    _worldPacket << int32(Reason);
+
+    return &_worldPacket;
+}
+
+void WorldPackets::Chat::CanLocalWhisperTargetRequest::Read()
+{
+    _worldPacket >> WhisperTarget;
+}
+
+WorldPacket const* WorldPackets::Chat::CanLocalWhisperTargetResponse::Write()
+{
+    _worldPacket << WhisperTarget;
+    _worldPacket << int32(Status);
+
+    return &_worldPacket;
+}
+
+void WorldPackets::Chat::UpdateAADCStatus::Read()
+{
+    ChatDisabled = _worldPacket.ReadBit();
+}
+
+WorldPacket const* WorldPackets::Chat::UpdateAADCStatusResponse::Write()
+{
+    _worldPacket.WriteBit(Success);
+    _worldPacket.WriteBit(ChatDisabled);
+    _worldPacket.FlushBits();
 
     return &_worldPacket;
 }

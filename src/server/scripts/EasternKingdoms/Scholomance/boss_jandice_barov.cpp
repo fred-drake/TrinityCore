@@ -39,15 +39,9 @@ class boss_jandice_barov : public CreatureScript
 public:
     boss_jandice_barov() : CreatureScript("boss_jandice_barov") { }
 
-    struct boss_jandicebarovAI : public ScriptedAI
+    struct boss_jandicebarovAI : public BossAI
     {
-        boss_jandicebarovAI(Creature* creature) : ScriptedAI(creature), Summons(me) { }
-
-        void Reset() override
-        {
-            events.Reset();
-            Summons.DespawnAll();
-        }
+        boss_jandicebarovAI(Creature* creature) : BossAI(creature, DATA_JANDICE_BAROV) { }
 
         void JustSummoned(Creature* summoned) override
         {
@@ -55,19 +49,19 @@ public:
             if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                 summoned->AI()->AttackStart(target);
 
-            summoned->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_MAGIC, true); // Not sure if this is correct.
-            Summons.Summon(summoned);
+            summons.Summon(summoned);
         }
 
-        void JustEngagedWith(Unit* /*who*/) override
+        void JustEngagedWith(Unit* who) override
         {
+            _JustEngagedWith(who);
             events.ScheduleEvent(EVENT_CURSE_OF_BLOOD, 15s);
             events.ScheduleEvent(EVENT_ILLUSION, 30s);
         }
 
         void JustDied(Unit* /*killer*/) override
         {
-            Summons.DespawnAll();
+            _JustDied();
             DoCastSelf(SPELL_DROP_JOURNAL, true);
         }
 
@@ -91,14 +85,14 @@ public:
                         break;
                     case EVENT_ILLUSION:
                         DoCast(SPELL_ILLUSION);
-                        me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                        me->SetUninteractible(true);
                         me->SetDisplayId(11686);  // Invisible Model
                         ModifyThreatByPercent(me->GetVictim(), -99);
                         events.ScheduleEvent(EVENT_SET_VISIBILITY, 3s);
                         events.ScheduleEvent(EVENT_ILLUSION, 25s);
                         break;
                     case EVENT_SET_VISIBILITY:
-                        me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                        me->SetUninteractible(false);
                         me->SetDisplayId(11073);     //Jandice Model
                         break;
                     default:
@@ -108,13 +102,7 @@ public:
                 if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
             }
-
-            DoMeleeAttackIfReady();
         }
-
-    private:
-        EventMap events;
-        SummonList Summons;
     };
 
     CreatureAI* GetAI(Creature* creature) const override
