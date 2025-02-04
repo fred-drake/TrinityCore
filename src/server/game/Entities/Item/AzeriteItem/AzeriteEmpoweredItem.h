@@ -20,17 +20,17 @@
 
 #include "Item.h"
 
-class TC_GAME_API AzeriteEmpoweredItem : public Item
+class TC_GAME_API AzeriteEmpoweredItem final : public Item
 {
 public:
     AzeriteEmpoweredItem();
 
     bool Create(ObjectGuid::LowType guidlow, uint32 itemId, ItemContext context, Player const* owner) override;
 
-    void SaveToDB(CharacterDatabaseTransaction& trans) override;
+    void SaveToDB(CharacterDatabaseTransaction trans) override;
     void LoadAzeriteEmpoweredItemData(Player const* owner, AzeriteEmpoweredItemData& azeriteEmpoweredItem);
-    static void DeleteFromDB(CharacterDatabaseTransaction& trans, ObjectGuid::LowType itemGuid);
-    void DeleteFromDB(CharacterDatabaseTransaction& trans) override;
+    static void DeleteFromDB(CharacterDatabaseTransaction trans, ObjectGuid::LowType itemGuid);
+    void DeleteFromDB(CharacterDatabaseTransaction trans) override;
 
     uint32 GetRequiredAzeriteLevelForTier(uint32 tier) const;
     int32 GetTierForAzeritePower(Classes playerClass, int32 azeritePowerId) const;
@@ -43,15 +43,27 @@ public:
     int64 GetRespecCost() const;
 
 protected:
-    void BuildValuesCreate(ByteBuffer* data, Player const* target) const override;
-    void BuildValuesUpdate(ByteBuffer* data, Player const* target) const override;
+    void BuildValuesCreate(ByteBuffer* data, UF::UpdateFieldFlag flags, Player const* target) const override;
+    void BuildValuesUpdate(ByteBuffer* data, UF::UpdateFieldFlag flags, Player const* target) const override;
     void ClearUpdateMask(bool remove) override;
 
 public:
     void BuildValuesUpdateForPlayerWithMask(UpdateData* data, UF::ObjectData::Mask const& requestedObjectMask, UF::ItemData::Mask const& requestedItemMask,
         UF::AzeriteEmpoweredItemData::Mask const& requestedAzeriteEmpoweredItemMask, Player const* target) const;
 
-    UF::UpdateField<UF::AzeriteEmpoweredItemData, 0, TYPEID_AZERITE_EMPOWERED_ITEM> m_azeriteEmpoweredItemData;
+    struct ValuesUpdateForPlayerWithMaskSender // sender compatible with MessageDistDeliverer
+    {
+        explicit ValuesUpdateForPlayerWithMaskSender(AzeriteEmpoweredItem const* owner) : Owner(owner) { }
+
+        AzeriteEmpoweredItem const* Owner;
+        UF::ObjectData::Base ObjectMask;
+        UF::ItemData::Base ItemMask;
+        UF::AzeriteEmpoweredItemData::Base AzeriteEmpoweredItemMask;
+
+        void operator()(Player const* player) const;
+    };
+
+    UF::UpdateField<UF::AzeriteEmpoweredItemData, int32(WowCS::EntityFragment::CGObject), TYPEID_AZERITE_EMPOWERED_ITEM> m_azeriteEmpoweredItemData;
 
 private:
     void InitAzeritePowerData();

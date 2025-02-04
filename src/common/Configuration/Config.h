@@ -20,6 +20,7 @@
 
 #include "Define.h"
 #include <string>
+#include <string_view>
 #include <vector>
 
 class TC_COMMON_API ConfigMgr
@@ -31,11 +32,16 @@ class TC_COMMON_API ConfigMgr
 
 public:
     /// Method used only for loading main configuration files (bnetserver.conf and worldserver.conf)
-    bool LoadInitial(std::string const& file, std::vector<std::string> args, std::string& error);
+    bool LoadInitial(std::string file, std::vector<std::string> args, std::string& error);
+    bool LoadAdditionalFile(std::string file, bool keepOnReload, std::string& error);
+    bool LoadAdditionalDir(std::string const& dir, bool keepOnReload, std::vector<std::string>& loadedFiles, std::vector<std::string>& errors);
+
+    /// Overrides configuration with environment variables and returns overridden keys
+    std::vector<std::string> OverrideWithEnvVariablesIfAny();
 
     static ConfigMgr* instance();
 
-    bool Reload(std::string& error);
+    bool Reload(std::vector<std::string>& errors);
 
     std::string GetStringDefault(std::string const& name, const std::string& def, bool quiet = false) const;
     bool GetBoolDefault(std::string const& name, bool def, bool quiet = false) const;

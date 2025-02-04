@@ -182,7 +182,7 @@ struct go_najentus_spine : public GameObjectAI
 {
     go_najentus_spine(GameObject* go) : GameObjectAI(go), _instance(go->GetInstanceScript()) { }
 
-    bool GossipHello(Player* player) override
+    bool OnGossipHello(Player* player) override
     {
         if (!_instance)
             return false;
@@ -203,8 +203,6 @@ private:
 // 39992 - Needle Spine Targeting
 class spell_najentus_needle_spine : public SpellScript
 {
-    PrepareSpellScript(spell_najentus_needle_spine);
-
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo({ SPELL_NEEDLE_SPINE });

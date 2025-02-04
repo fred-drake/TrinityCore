@@ -32,13 +32,11 @@ namespace Battlenet
 
         bool StartNetwork(Trinity::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int threadCount = 1) override;
 
-        void FixLegacyAuthHashes();
-
     protected:
         NetworkThread<Session>* CreateThreads() const override;
 
     private:
-        static void OnSocketAccept(tcp::socket&& sock, uint32 threadIndex);
+        static void OnSocketAccept(boost::asio::ip::tcp::socket&& sock, uint32 threadIndex);
     };
 }
 

@@ -33,7 +33,6 @@ EndContentData */
 #include "CellImpl.h"
 #include "GameObjectAI.h"
 #include "GridNotifiersImpl.h"
-#include "Log.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
 #include "ScriptedEscortAI.h"
@@ -85,8 +84,8 @@ public:
 
             DoCastSelf(SPELL_IRRIDATION, true);
 
-            me->AddUnitFlag(UNIT_FLAG_PLAYER_CONTROLLED);
-            me->AddUnitFlag(UNIT_FLAG_IN_COMBAT);
+            me->SetUnitFlag(UNIT_FLAG_PLAYER_CONTROLLED);
+            me->SetUnitFlag(UNIT_FLAG_IN_COMBAT);
             me->SetHealth(me->CountPctFromMaxHealth(10));
             me->SetStandState(UNIT_STAND_STATE_SLEEP);
         }
@@ -201,7 +200,7 @@ public:
         {
             Initialize();
             NormFaction = creature->GetFaction();
-            NpcFlags = NPCFlags(creature->m_unitData->NpcFlags[0]);
+            NpcFlags = creature->GetNpcFlags();
         }
 
         void Initialize()
@@ -220,7 +219,7 @@ public:
             Initialize();
 
             me->SetFaction(NormFaction);
-            me->SetNpcFlags(NpcFlags);
+            me->ReplaceAllNpcFlags(NpcFlags);
         }
 
         void JustEngagedWith(Unit* who) override
@@ -228,7 +227,7 @@ public:
             Talk(ATTACK_YELL, who);
         }
 
-        bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 /*gossipListId*/) override
+        bool OnGossipSelect(Player* player, uint32 /*menuId*/, uint32 /*gossipListId*/) override
         {
             CloseGossipMenuFor(player);
             me->SetFaction(FACTION_MONSTER);
@@ -258,8 +257,6 @@ public:
                 DoCastVictim(SPELL_DYNAMITE);
                 DynamiteTimer = 8000;
             } else DynamiteTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
 
     private:
@@ -291,7 +288,7 @@ public:
 
         void Reset() override
         {
-            me->AddUnitFlag(UNIT_FLAG_IN_COMBAT);
+            me->SetUnitFlag(UNIT_FLAG_IN_COMBAT);
             me->SetHealth(me->CountPctFromMaxHealth(15));
             switch (urand(0, 1))
             {
@@ -337,7 +334,8 @@ enum Magwin
     EVENT_STAND                 = 3,
     EVENT_TALK_END              = 4,
     EVENT_COWLEN_TALK           = 5,
-    QUEST_A_CRY_FOR_HELP        = 9528
+    QUEST_A_CRY_FOR_HELP        = 9528,
+    PATH_ESCORT_MAGWIN          = 138498,
 };
 
 class npc_magwin : public CreatureScript
@@ -359,7 +357,7 @@ public:
             Talk(SAY_AGGRO, who);
         }
 
-        void QuestAccept(Player* player, Quest const* quest) override
+        void OnQuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_A_CRY_FOR_HELP)
             {
@@ -380,7 +378,6 @@ public:
                     case 28:
                         player->GroupEventHappens(QUEST_A_CRY_FOR_HELP, me);
                         _events.ScheduleEvent(EVENT_TALK_END, 2s);
-                        SetRun(true);
                         break;
                     case 29:
                         if (Creature* cowlen = me->FindNearestCreature(NPC_COWLEN, 50.0f, true))
@@ -407,7 +404,10 @@ public:
                         break;
                     case EVENT_START_ESCORT:
                         if (Player* player = ObjectAccessor::GetPlayer(*me, _player))
-                            EscortAI::Start(true, false, player->GetGUID());
+                        {
+                            LoadPath(PATH_ESCORT_MAGWIN);
+                            EscortAI::Start(true, player->GetGUID());
+                        }
                         _events.ScheduleEvent(EVENT_STAND, 2s);
                         break;
                     case EVENT_STAND: // Remove kneel standstate. Using a separate delayed event because it causes unwanted delay before starting waypoint movement.
@@ -596,8 +596,6 @@ public:
                         (*itr)->Respawn();
                 }
             }
-            else
-                TC_LOG_ERROR("scripts", "SD2 ERROR: FlagList is empty!");
         }
 
         void UpdateAI(uint32 diff) override
@@ -618,11 +616,9 @@ public:
     }
 };
 
-// 29528 -  Inoculate Nestlewood Owlkin
+// 29528 - Inoculate Nestlewood Owlkin
 class spell_inoculate_nestlewood : public AuraScript
 {
-    PrepareAuraScript(spell_inoculate_nestlewood);
-
     void PeriodicTick(AuraEffect const* /*aurEff*/)
     {
         if (GetTarget()->GetTypeId() != TYPEID_UNIT) // prevent error reports in case ignored player target
@@ -635,11 +631,41 @@ class spell_inoculate_nestlewood : public AuraScript
     }
 };
 
+/*######
+## Quest 9452: Red Snapper - Very Tasty!
+######*/
+
+enum RedSnapperVeryTasty
+{
+    SPELL_FISHED_UP_RED_SNAPPER  = 29867,
+    SPELL_FISHED_UP_MURLOC       = 29869
+};
+
+// 29866 - Cast Fishing Net
+class spell_azuremyst_isle_cast_fishing_net : public SpellScript
+{
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_FISHED_UP_RED_SNAPPER, SPELL_FISHED_UP_MURLOC });
+    }
+
+    void HandleDummy(SpellEffIndex /*effIndex*/)
+    {
+        GetCaster()->CastSpell(GetCaster(), roll_chance_i(66) ? SPELL_FISHED_UP_RED_SNAPPER : SPELL_FISHED_UP_MURLOC);
+    }
+
+    void Register() override
+    {
+        OnEffectHit += SpellEffectFn(spell_azuremyst_isle_cast_fishing_net::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
 void AddSC_azuremyst_isle()
 {
     new npc_draenei_survivor();
     new npc_engineer_spark_overgrind();
     new npc_injured_draenei();
     new npc_magwin();
-    RegisterAuraScript(spell_inoculate_nestlewood);
+    RegisterSpellScript(spell_inoculate_nestlewood);
+    RegisterSpellScript(spell_azuremyst_isle_cast_fishing_net);
 }

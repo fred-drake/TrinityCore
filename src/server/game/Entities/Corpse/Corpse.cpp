@@ -22,12 +22,12 @@
 #include "DB2Stores.h"
 #include "GameTime.h"
 #include "Log.h"
+#include "Loot.h"
 #include "Map.h"
-#include "ObjectAccessor.h"
 #include "PhasingHandler.h"
 #include "Player.h"
+#include "StringConvert.h"
 #include "UpdateData.h"
-#include "World.h"
 #include <sstream>
 
 Corpse::Corpse(CorpseType type) : WorldObject(type != CORPSE_BONES), m_type(type)
@@ -36,6 +36,8 @@ Corpse::Corpse(CorpseType type) : WorldObject(type != CORPSE_BONES), m_type(type
     m_objectTypeId = TYPEID_CORPSE;
 
     m_updateFlag.Stationary = true;
+
+    m_entityFragments.Add(WowCS::EntityFragment::Tag_Corpse, false);
 
     m_time = GameTime::GetGameTime();
 
@@ -48,7 +50,7 @@ void Corpse::AddToWorld()
 {
     ///- Register the corpse for guid lookup
     if (!IsInWorld())
-        GetMap()->GetObjectsStore().Insert<Corpse>(GetGUID(), this);
+        GetMap()->GetObjectsStore().Insert<Corpse>(this);
 
     Object::AddToWorld();
 }
@@ -57,7 +59,7 @@ void Corpse::RemoveFromWorld()
 {
     ///- Remove the corpse from the accessor
     if (IsInWorld())
-        GetMap()->GetObjectsStore().Remove<Corpse>(GetGUID());
+        GetMap()->GetObjectsStore().Remove<Corpse>(this);
 
     WorldObject::RemoveFromWorld();
 }
@@ -76,8 +78,8 @@ bool Corpse::Create(ObjectGuid::LowType guidlow, Player* owner)
 
     if (!IsPositionValid())
     {
-        TC_LOG_ERROR("entities.player", "Corpse (guidlow " UI64FMTD ", owner %s) not created. Suggested coordinates isn't valid (X: %f Y: %f)",
-            guidlow, owner->GetName().c_str(), owner->GetPositionX(), owner->GetPositionY());
+        TC_LOG_ERROR("entities.player", "Corpse (guidlow {}, owner {}) not created. Suggested coordinates isn't valid (X: {} Y: {})",
+            guidlow, owner->GetName(), owner->GetPositionX(), owner->GetPositionY());
         return false;
     }
 
@@ -93,6 +95,14 @@ bool Corpse::Create(ObjectGuid::LowType guidlow, Player* owner)
     return true;
 }
 
+void Corpse::Update(uint32 diff)
+{
+    WorldObject::Update(diff);
+
+    if (m_loot)
+        m_loot->Update();
+}
+
 void Corpse::SaveToDB()
 {
     // prevent DB data inconsistence problems and duplicates
@@ -100,7 +110,7 @@ void Corpse::SaveToDB()
     DeleteFromDB(trans);
 
     std::ostringstream items;
-    for (uint16 index = 0; index < EQUIPMENT_SLOT_END; ++index)
+    for (size_t index = 0; index < m_corpseData->Items.size(); ++index)
         items << m_corpseData->Items[index] << ' ';
 
     uint16 index = 0;
@@ -145,12 +155,12 @@ void Corpse::SaveToDB()
     CharacterDatabase.CommitTransaction(trans);
 }
 
-void Corpse::DeleteFromDB(CharacterDatabaseTransaction& trans)
+void Corpse::DeleteFromDB(CharacterDatabaseTransaction trans)
 {
     DeleteFromDB(GetOwnerGUID(), trans);
 }
 
-void Corpse::DeleteFromDB(ObjectGuid const& ownerGuid, CharacterDatabaseTransaction& trans)
+void Corpse::DeleteFromDB(ObjectGuid const& ownerGuid, CharacterDatabaseTransaction trans)
 {
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CORPSE);
     stmt->setUInt64(0, ownerGuid.GetCounter());
@@ -185,16 +195,16 @@ bool Corpse::LoadCorpseFromDB(ObjectGuid::LowType guid, Field* fields)
 
     SetObjectScale(1.0f);
     SetDisplayId(fields[5].GetUInt32());
-    Tokenizer items(fields[6].GetString(), ' ', EQUIPMENT_SLOT_END);
-    if (items.size() == EQUIPMENT_SLOT_END)
-        for (uint32 index = 0; index < EQUIPMENT_SLOT_END; ++index)
-            SetItem(index, atoul(items[index]));
+    std::vector<std::string_view> items = Trinity::Tokenize(fields[6].GetStringView(), ' ', false);
+    if (items.size() == m_corpseData->Items.size())
+        for (size_t index = 0; index < m_corpseData->Items.size(); ++index)
+            SetItem(index, Trinity::StringTo<uint32>(items[index]).value_or(0));
 
     SetRace(fields[7].GetUInt8());
     SetClass(fields[8].GetUInt8());
     SetSex(fields[9].GetUInt8());
-    SetFlags(fields[10].GetUInt8());
-    SetCorpseDynamicFlags(CorpseDynFlags(fields[11].GetUInt8()));
+    ReplaceAllFlags(fields[10].GetUInt8());
+    ReplaceAllCorpseDynamicFlags(CorpseDynFlags(fields[11].GetUInt8()));
     SetOwnerGUID(ObjectGuid::Create<HighGuid::Player>(fields[15].GetUInt64()));
     SetFactionTemplate(sChrRacesStore.AssertEntry(m_corpseData->RaceID)->FactionID);
 
@@ -209,8 +219,8 @@ bool Corpse::LoadCorpseFromDB(ObjectGuid::LowType guid, Field* fields)
 
     if (!IsPositionValid())
     {
-        TC_LOG_ERROR("entities.player", "Corpse (%s, owner: %s) is not created, given coordinates are not valid (X: %f, Y: %f, Z: %f)",
-            GetGUID().ToString().c_str(), GetOwnerGUID().ToString().c_str(), posX, posY, posZ);
+        TC_LOG_ERROR("entities.player", "Corpse ({}, owner: {}) is not created, given coordinates are not valid (X: {}, Y: {}, Z: {})",
+            GetGUID().ToString(), GetOwnerGUID().ToString(), posX, posY, posZ);
         return false;
     }
 
@@ -230,22 +240,14 @@ bool Corpse::IsExpired(time_t t) const
         return m_time < t - 3 * DAY;
 }
 
-void Corpse::BuildValuesCreate(ByteBuffer* data, Player const* target) const
+void Corpse::BuildValuesCreate(ByteBuffer* data, UF::UpdateFieldFlag flags, Player const* target) const
 {
-    UF::UpdateFieldFlag flags = GetUpdateFieldFlagsFor(target);
-    std::size_t sizePos = data->wpos();
-    *data << uint32(0);
-    *data << uint8(flags);
     m_objectData->WriteCreate(*data, flags, this, target);
     m_corpseData->WriteCreate(*data, flags, this, target);
-    data->put<uint32>(sizePos, data->wpos() - sizePos - 4);
 }
 
-void Corpse::BuildValuesUpdate(ByteBuffer* data, Player const* target) const
+void Corpse::BuildValuesUpdate(ByteBuffer* data, UF::UpdateFieldFlag flags, Player const* target) const
 {
-    UF::UpdateFieldFlag flags = GetUpdateFieldFlagsFor(target);
-    std::size_t sizePos = data->wpos();
-    *data << uint32(0);
     *data << uint32(m_values.GetChangedObjectTypeMask());
 
     if (m_values.HasChanged(TYPEID_OBJECT))
@@ -253,13 +255,12 @@ void Corpse::BuildValuesUpdate(ByteBuffer* data, Player const* target) const
 
     if (m_values.HasChanged(TYPEID_CORPSE))
         m_corpseData->WriteUpdate(*data, flags, this, target);
-
-    data->put<uint32>(sizePos, data->wpos() - sizePos - 4);
 }
 
 void Corpse::BuildValuesUpdateForPlayerWithMask(UpdateData* data, UF::ObjectData::Mask const& requestedObjectMask,
     UF::CorpseData::Mask const& requestedCorpseMask, Player const* target) const
 {
+    UF::UpdateFieldFlag flags = GetUpdateFieldFlagsFor(target);
     UpdateMask<NUM_CLIENT_OBJECT_TYPES> valuesMask;
     if (requestedObjectMask.IsAnySet())
         valuesMask.Set(TYPEID_OBJECT);
@@ -267,9 +268,10 @@ void Corpse::BuildValuesUpdateForPlayerWithMask(UpdateData* data, UF::ObjectData
     if (requestedCorpseMask.IsAnySet())
         valuesMask.Set(TYPEID_CORPSE);
 
-    ByteBuffer buffer = PrepareValuesUpdateBuffer();
+    ByteBuffer& buffer = PrepareValuesUpdateBuffer(data);
     std::size_t sizePos = buffer.wpos();
     buffer << uint32(0);
+    BuildEntityFragmentsForValuesUpdateForPlayerWithMask(&buffer, flags);
     buffer << uint32(valuesMask.GetBlock(0));
 
     if (valuesMask[TYPEID_OBJECT])
@@ -280,7 +282,18 @@ void Corpse::BuildValuesUpdateForPlayerWithMask(UpdateData* data, UF::ObjectData
 
     buffer.put<uint32>(sizePos, buffer.wpos() - sizePos - 4);
 
-    data->AddUpdateBlock(buffer);
+    data->AddUpdateBlock();
+}
+
+void Corpse::ValuesUpdateForPlayerWithMaskSender::operator()(Player const* player) const
+{
+    UpdateData udata(Owner->GetMapId());
+    WorldPacket packet;
+
+    Owner->BuildValuesUpdateForPlayerWithMask(&udata, ObjectMask.GetChangesMask(), CorpseMask.GetChangesMask(), player);
+
+    udata.BuildPacket(&packet);
+    player->SendDirectMessage(&packet);
 }
 
 void Corpse::ClearUpdateMask(bool remove)

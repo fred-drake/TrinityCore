@@ -15,10 +15,11 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptMgr.h"
 #include "ahnkahet.h"
 #include "InstanceScript.h"
+#include "Player.h"
 #include "ScriptedCreature.h"
+#include "ScriptMgr.h"
 #include "SpellScript.h"
 
 enum AmanitarSpells
@@ -188,12 +189,10 @@ struct boss_amanitar : public BossAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        DoMeleeAttackIfReady();
     }
 
-    private:
-        std::deque<Position> _mushroomsDeque;
+private:
+    std::deque<Position> _mushroomsDeque;
 };
 
 struct npc_amanitar_mushrooms : public ScriptedAI
@@ -209,12 +208,34 @@ struct npc_amanitar_mushrooms : public ScriptedAI
         DoCastSelf(SPELL_GROW, true);
 
         if (me->GetEntry() == NPC_HEALTHY_MUSHROOM)
-        {
             DoCastSelf(SPELL_POWER_MUSHROOM_VISUAL_AURA);
-            _active = true;
-        }
         else
+        {
             DoCastSelf(SPELL_POISONOUS_MUSHROOM_VISUAL_AURA);
+
+            _scheduler.Schedule(1s, [this](TaskContext checkRangeContext)
+            {
+                std::vector<Player*> playersNearby;
+                GetPlayerListInGrid(playersNearby, me, 2.0f);
+                if (!playersNearby.empty())
+                {
+                    _active = true;
+
+                    for (Player* foundPlayer : playersNearby)
+                        foundPlayer->RemoveAurasDueToSpell(SPELL_POTENT_FUNGUS);
+
+                    DoCastAOE(SPELL_POISONOUS_MUSHROOM_POISON_CLOUD);
+
+                    _scheduler.Schedule(Seconds(1), [this](TaskContext /*context*/)
+                    {
+                        me->SetObjectScale(0.1f);
+                        me->DespawnOrUnsummon(Seconds(4));
+                    });
+                }
+                else
+                    checkRangeContext.Repeat(1s);
+            });
+        }
 
         _scheduler.Schedule(Milliseconds(800), [this](TaskContext /*context*/)
         {
@@ -222,27 +243,12 @@ struct npc_amanitar_mushrooms : public ScriptedAI
         });
     }
 
-    void MoveInLineOfSight(Unit* target) override
-    {
-        if (_active || target->GetTypeId() != TYPEID_PLAYER || me->GetDistance2d(target) > 2.0f)
-            return;
-
-        _active = true;
-
-        target->RemoveAurasDueToSpell(SPELL_POTENT_FUNGUS);
-        DoCastAOE(SPELL_POISONOUS_MUSHROOM_POISON_CLOUD);
-
-        _scheduler.Schedule(Seconds(1), [this](TaskContext /*context*/)
-        {
-            me->SetObjectScale(0.1f);
-            me->DespawnOrUnsummon(Seconds(4));
-        });
-    }
-
     void JustDied(Unit* /*killer*/) override
     {
         if (me->GetEntry() == NPC_HEALTHY_MUSHROOM)
             DoCastAOE(SPELL_POTENT_FUNGUS, true);
+        else if (!_active)
+            DoCastAOE(SPELL_POISONOUS_MUSHROOM_POISON_CLOUD);
     }
 
     void UpdateAI(uint32 diff) override
@@ -258,8 +264,6 @@ private:
 // 56648 - Potent Fungus
 class spell_amanitar_potent_fungus : public AuraScript
 {
-    PrepareAuraScript(spell_amanitar_potent_fungus);
-
     void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         Unit* target = GetTarget();
@@ -280,5 +284,5 @@ void AddSC_boss_amanitar()
 {
     RegisterAhnKahetCreatureAI(boss_amanitar);
     RegisterAhnKahetCreatureAI(npc_amanitar_mushrooms);
-    RegisterAuraScript(spell_amanitar_potent_fungus);
+    RegisterSpellScript(spell_amanitar_potent_fungus);
 }

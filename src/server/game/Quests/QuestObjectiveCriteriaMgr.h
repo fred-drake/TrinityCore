@@ -19,6 +19,7 @@
 #define QuestObjectiveCriteriaMgr_h__
 
 #include "CriteriaHandler.h"
+#include "DatabaseEnvFwd.h"
 
 class TC_GAME_API QuestObjectiveCriteriaMgr : public CriteriaHandler
 {
@@ -32,10 +33,9 @@ public:
 
     static void DeleteFromDB(ObjectGuid const& guid);
     void LoadFromDB(PreparedQueryResult objectiveResult, PreparedQueryResult criteriaResult);
-    void SaveToDB(CharacterDatabaseTransaction& trans);
+    void SaveToDB(CharacterDatabaseTransaction trans);
 
-    void ResetCriteria(CriteriaFailEvent failEvent, int32 failAsset, bool evenIfCriteriaComplete = false);
-    void ResetCriteriaTree(uint32 criteriaTreeId);
+    void ResetCriteriaTree(QuestObjective const* questObjective);
 
     void SendAllData(Player const* receiver) const override;
 
@@ -55,6 +55,8 @@ protected:
 
     std::string GetOwnerInfo() const override;
     CriteriaList const& GetCriteriaByType(CriteriaType type, uint32 asset) const override;
+
+    bool RequiredAchievementSatisfied(uint32 achievementId) const override;
 
 private:
     Player* _owner;

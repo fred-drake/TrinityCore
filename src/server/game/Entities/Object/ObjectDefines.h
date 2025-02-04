@@ -38,9 +38,13 @@
 
 #define DEFAULT_PLAYER_BOUNDING_RADIUS      0.388999998569489f     // player size, also currently used (correctly?) for any non Unit world objects
 #define DEFAULT_PLAYER_COMBAT_REACH         1.5f
+#define DEFAULT_PLAYER_DISPLAY_SCALE        1.0f
+#define DEFAULT_PLAYER_HOVER_HEIGHT         1.0f
 #define MIN_MELEE_REACH                     2.0f
 #define NOMINAL_MELEE_RANGE                 5.0f
 #define MELEE_RANGE                         (NOMINAL_MELEE_RANGE - MIN_MELEE_REACH * 2) //center to center for players
+
+#define EXTRA_CELL_SEARCH_RADIUS            40.0f // We need in some cases increase search radius. Allow to find creatures with huge combat reach in a different nearby cell.
 
 enum class VisibilityDistanceType : uint8
 {
@@ -54,7 +58,7 @@ enum class VisibilityDistanceType : uint8
     Max
 };
 
-enum TempSummonType
+enum TempSummonType : uint8
 {
     TEMPSUMMON_TIMED_OR_DEAD_DESPAWN       = 1,             // despawns after a specified time OR when the creature disappears
     TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN     = 2,             // despawns after a specified time OR when the creature dies

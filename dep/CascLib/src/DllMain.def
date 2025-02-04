@@ -17,6 +17,7 @@ EXPORTS
     CascOpenFile
     CascOpenLocalFile
     CascGetFileInfo
+    CascSetFileFlags
     CascGetFileSize
     CascGetFileSize64
     CascSetFilePointer
@@ -33,5 +34,9 @@ EXPORTS
     CascFindEncryptionKey
     CascGetNotFoundEncryptionKey
 
-    GetLastError=Kernel32.GetLastError
-    SetLastError=Kernel32.SetLastError
+    CascCdnGetDefault
+    CascCdnDownload
+    CascCdnFree
+
+    GetCascError
+    SetCascError

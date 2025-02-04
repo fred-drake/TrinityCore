@@ -23,6 +23,7 @@ SDCategory: Karazhan
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "Containers.h"
 #include "karazhan.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
@@ -122,7 +123,7 @@ public:
             });
         }
 
-        void DamageTaken(Unit* /*attacker*/, uint32 &damage) override
+        void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             // Attumen does not die until he mounts Midnight, let health fall to 1 and prevent further damage.
             if (damage >= me->GetHealth() && _phase != PHASE_MOUNTED)
@@ -218,8 +219,7 @@ public:
             if (!UpdateVictim() && _phase != PHASE_NONE)
                 return;
 
-            scheduler.Update(diff,
-                std::bind(&BossAI::DoMeleeAttackIfReady, this));
+            scheduler.Update(diff);
         }
 
         void SpellHit(WorldObject* /*caster*/, SpellInfo const* spellInfo) override
@@ -305,7 +305,7 @@ public:
             me->SetReactState(REACT_DEFENSIVE);
         }
 
-        void DamageTaken(Unit* /*attacker*/, uint32 &damage) override
+        void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             // Midnight never dies, let health fall to 1 and prevent further damage.
             if (damage >= me->GetHealth())
@@ -367,8 +367,7 @@ public:
             if (!UpdateVictim() || _phase == PHASE_MOUNTED)
                 return;
 
-            scheduler.Update(diff,
-                std::bind(&BossAI::DoMeleeAttackIfReady, this));
+            scheduler.Update(diff);
         }
 
         private:

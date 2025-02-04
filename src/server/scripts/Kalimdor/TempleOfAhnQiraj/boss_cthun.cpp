@@ -209,7 +209,8 @@ public:
             //Reset flags
             me->RemoveAurasDueToSpell(SPELL_RED_COLORATION);
             me->RemoveAurasDueToSpell(SPELL_FREEZE_ANIM);
-            me->RemoveUnitFlag(UnitFlags(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE));
+            me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUninteractible(false);
             me->SetVisible(true);
 
             //Reset Phase
@@ -403,7 +404,7 @@ public:
             }
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             switch (instance->GetData(DATA_CTHUN_PHASE))
             {
@@ -420,7 +421,8 @@ public:
                     me->RemoveAurasDueToSpell(SPELL_RED_COLORATION);
 
                     //Reset to normal emote state and prevent select and attack
-                    me->AddUnitFlag(UnitFlags(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE));
+                    me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                    me->SetUninteractible(true);
 
                     //Remove Target field
                     me->SetTarget(ObjectGuid::Empty);
@@ -523,7 +525,8 @@ public:
 
             //Reset flags
             me->RemoveAurasDueToSpell(SPELL_TRANSFORM);
-            me->AddUnitFlag(UnitFlags(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE));
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUninteractible(true);
             me->SetVisible(false);
 
             instance->SetData(DATA_CTHUN_PHASE, PHASE_NOT_STARTED);
@@ -632,7 +635,8 @@ public:
                         me->SetFullHealth();
 
                         me->SetVisible(true);
-                        me->RemoveUnitFlag(UnitFlags(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE));
+                        me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                        me->SetUninteractible(false);
 
                         //Emerging phase
                         //AttackStart(ObjectAccessor::GetUnit(*me, HoldpPlayer));
@@ -841,7 +845,7 @@ public:
             instance->SetData(DATA_CTHUN_PHASE, PHASE_CTHUN_DONE);
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             switch (instance->GetData(DATA_CTHUN_PHASE))
             {
@@ -1065,8 +1069,6 @@ public:
                 DoCastVictim(SPELL_HAMSTRING);
                 HamstringTimer = 5000;
             } else HamstringTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -1189,8 +1191,6 @@ public:
                 DoCastVictim(SPELL_HAMSTRING);
                 HamstringTimer = 10000;
             } else HamstringTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 

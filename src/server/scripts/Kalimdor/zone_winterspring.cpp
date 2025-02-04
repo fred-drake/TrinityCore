@@ -35,7 +35,6 @@ EndContentData */
 #include "Player.h"
 #include "ScriptedEscortAI.h"
 #include "TemporarySummon.h"
-#include "WorldSession.h"
 
 enum Says
 {
@@ -257,6 +256,8 @@ static Position wingThicketLocations[] =
 # npc_ranshalla
 #####*/
 
+static constexpr uint32 PATH_ESCORT_RANSHALLA = 82402;
+
 class npc_ranshalla : public CreatureScript
 {
 public:
@@ -413,7 +414,7 @@ public:
                     break;
                 case SAY_PRIESTESS_ALTAR_8:
                     // make the gem respawn
-                    if (GameObject* gem = GetClosestGameObjectWithEntry(me, GO_ELUNE_GEM, 10.0f))
+                    if (GameObject* gem = GetClosestGameObjectWithEntry(me, GO_ELUNE_GEM, 10.0f, false))
                     {
                         if (gem->isSpawned())
                             break;
@@ -538,14 +539,15 @@ public:
             EscortAI::UpdateEscortAI(diff);
         }
 
-        void QuestAccept(Player* player, Quest const* quest) override
+        void OnQuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_GUARDIANS_ALTAR)
             {
                 Talk(SAY_QUEST_START);
                 me->SetFaction(FACTION_ESCORTEE_A_NEUTRAL_PASSIVE);
 
-                Start(false, false, player->GetGUID(), quest);
+                LoadPath(PATH_ESCORT_RANSHALLA);
+                Start(false, player->GetGUID(), quest);
             }
         }
 
@@ -572,7 +574,7 @@ public:
     {
         go_elune_fireAI(GameObject* go) : GameObjectAI(go) { }
 
-        bool GossipHello(Player* /*player*/) override
+        bool OnGossipHello(Player* /*player*/) override
         {
             // Check if we are using the torches or the altar
             bool isAltar = false;
@@ -585,7 +587,7 @@ public:
                 if (npc_ranshalla::npc_ranshallaAI* escortAI = dynamic_cast<npc_ranshalla::npc_ranshallaAI*>(ranshalla->AI()))
                     escortAI->DoContinueEscort(isAltar);
             }
-            me->AddFlag(GO_FLAG_NOT_SELECTABLE);
+            me->SetFlag(GO_FLAG_NOT_SELECTABLE);
             return false;
         }
     };
