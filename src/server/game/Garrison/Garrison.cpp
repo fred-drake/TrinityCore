@@ -69,7 +69,6 @@ bool Garrison::LoadFromDB(PreparedQueryResult garrison, PreparedQueryResult blue
             time_t timeBuilt = fields[2].GetInt64();
             bool active = fields[3].GetBool();
 
-
             Plot* plot = GetPlot(plotInstanceId);
             if (!plot)
                 continue;
@@ -288,27 +287,15 @@ void Garrison::Upgrade()
 void Garrison::Enter() const
 {
     if (MapEntry const* map = sMapStore.LookupEntry(_siteLevel->MapID))
-    {
         if (int32(_owner->GetMapId()) == map->ParentMapID)
-        {
-            WorldLocation loc(_siteLevel->MapID);
-            loc.Relocate(_owner);
-            _owner->TeleportTo(loc, TELE_TO_SEAMLESS);
-        }
-    }
+            _owner->TeleportTo(WorldLocation(_siteLevel->MapID, *_owner), TELE_TO_SEAMLESS);
 }
 
 void Garrison::Leave() const
 {
     if (MapEntry const* map = sMapStore.LookupEntry(_siteLevel->MapID))
-    {
         if (_owner->GetMapId() == _siteLevel->MapID)
-        {
-            WorldLocation loc(map->ParentMapID);
-            loc.Relocate(_owner);
-            _owner->TeleportTo(loc, TELE_TO_SEAMLESS);
-        }
-    }
+            _owner->TeleportTo(WorldLocation(map->ParentMapID, *_owner), TELE_TO_SEAMLESS);
 }
 
 GarrisonFactionIndex Garrison::GetFaction() const
@@ -408,7 +395,7 @@ void Garrison::PlaceBuilding(uint32 garrPlotInstanceId, uint32 garrBuildingId)
             if (GameObject* go = plot->CreateGameObject(map, GetFaction()))
                 map->AddToMap(go);
 
-        _owner->ModifyCurrency(building->CurrencyTypeID, -building->CurrencyQty, false, true);
+        _owner->RemoveCurrency(building->CurrencyTypeID, building->CurrencyQty, CurrencyDestroyReason::Garrison);
         _owner->ModifyMoney(-building->GoldCost * GOLD, false);
 
         if (oldBuildingId)
@@ -448,7 +435,7 @@ void Garrison::CancelBuildingConstruction(uint32 garrPlotInstanceId)
 
         GarrBuildingEntry const* constructing = sGarrBuildingStore.AssertEntry(buildingRemoved.GarrBuildingID);
         // Refund construction/upgrade cost
-        _owner->ModifyCurrency(constructing->CurrencyTypeID, constructing->CurrencyQty, false, true);
+        _owner->AddCurrency(constructing->CurrencyTypeID, constructing->CurrencyQty, CurrencyGainSource::GarrisonBuildingRefund);
         _owner->ModifyMoney(constructing->GoldCost * GOLD, false);
 
         if (constructing->UpgradeLevel > 1)
@@ -731,7 +718,7 @@ GameObject* Garrison::Plot::CreateGameObject(Map* map, GarrisonFactionIndex fact
 
     if (!sObjectMgr->GetGameObjectTemplate(entry))
     {
-        TC_LOG_ERROR("garrison", "Garrison attempted to spawn gameobject whose template doesn't exist (%u)", entry);
+        TC_LOG_ERROR("garrison", "Garrison attempted to spawn gameobject whose template doesn't exist ({})", entry);
         return nullptr;
     }
 
@@ -760,15 +747,18 @@ GameObject* Garrison::Plot::CreateGameObject(Map* map, GarrisonFactionIndex fact
 
     if (building->GetGoType() == GAMEOBJECT_TYPE_GARRISON_BUILDING && building->GetGOInfo()->garrisonBuilding.SpawnMap)
     {
-        for (CellObjectGuidsMap::value_type const& cellGuids : sObjectMgr->GetMapObjectGuids(building->GetGOInfo()->garrisonBuilding.SpawnMap, map->GetDifficultyID()))
+        if (CellObjectGuidsMap const* cells = sObjectMgr->GetMapObjectGuids(building->GetGOInfo()->garrisonBuilding.SpawnMap, map->GetDifficultyID()))
         {
-            for (ObjectGuid::LowType spawnId : cellGuids.second.creatures)
-                if (Creature* spawn = BuildingSpawnHelper<Creature, &Creature::SetHomePosition>(building, spawnId, map))
-                    BuildingInfo.Spawns.insert(spawn->GetGUID());
+            for (auto const& [cellId, guids] : *cells)
+            {
+                for (ObjectGuid::LowType spawnId : guids.gameobjects)
+                    if (GameObject* spawn = BuildingSpawnHelper<GameObject, &GameObject::RelocateStationaryPosition>(building, spawnId, map))
+                        BuildingInfo.Spawns.insert(spawn->GetGUID());
 
-            for (ObjectGuid::LowType spawnId : cellGuids.second.gameobjects)
-                if (GameObject* spawn = BuildingSpawnHelper<GameObject, &GameObject::RelocateStationaryPosition>(building, spawnId, map))
-                    BuildingInfo.Spawns.insert(spawn->GetGUID());
+                for (ObjectGuid::LowType spawnId : guids.creatures)
+                    if (Creature* spawn = BuildingSpawnHelper<Creature, &Creature::SetHomePosition>(building, spawnId, map))
+                        BuildingInfo.Spawns.insert(spawn->GetGUID());
+            }
         }
     }
 

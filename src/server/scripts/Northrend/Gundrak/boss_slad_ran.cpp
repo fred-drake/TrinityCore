@@ -133,13 +133,10 @@ struct boss_slad_ran : public BossAI
         if (!UpdateVictim())
             return;
 
-        scheduler.Update(diff, [this]
-        {
-            DoMeleeAttackIfReady();
-        });
+        scheduler.Update(diff);
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
+    void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (_phase == Phase::PHASE_NONE && HealthBelowPct(30))
         {
@@ -299,8 +296,8 @@ class achievement_snakes_whyd_it_have_to_be_snakes : public AchievementCriteriaS
 
 void AddSC_boss_slad_ran()
 {
-    RegisterCreatureAIWithFactory(boss_slad_ran, GetGundrakAI);
-    RegisterCreatureAIWithFactory(npc_slad_ran_constrictor, GetGundrakAI);
-    RegisterCreatureAIWithFactory(npc_slad_ran_viper, GetGundrakAI);
+    RegisterGundrakCreatureAI(boss_slad_ran);
+    RegisterGundrakCreatureAI(npc_slad_ran_constrictor);
+    RegisterGundrakCreatureAI(npc_slad_ran_viper);
     new achievement_snakes_whyd_it_have_to_be_snakes();
 }

@@ -17,7 +17,6 @@
 
 #include "GuardAI.h"
 #include "Creature.h"
-#include "Errors.h"
 #include "Log.h"
 #include "MotionMaster.h"
 #include "Player.h"
@@ -32,10 +31,7 @@ int32 GuardAI::Permissible(Creature const* creature)
 
 void GuardAI::UpdateAI(uint32 /*diff*/)
 {
-    if (!UpdateVictim())
-        return;
-
-    DoMeleeAttackIfReady();
+    UpdateVictim();
 }
 
 bool GuardAI::CanSeeAlways(WorldObject const* obj)
@@ -56,7 +52,7 @@ void GuardAI::EnterEvadeMode(EvadeReason /*why*/)
         return;
     }
 
-    TC_LOG_TRACE("scripts.ai", "GuardAI::EnterEvadeMode: %s enters evade mode.", me->GetGUID().ToString().c_str());
+    TC_LOG_TRACE("scripts.ai", "GuardAI::EnterEvadeMode: {} enters evade mode.", me->GetGUID().ToString());
 
     me->RemoveAllAuras();
     me->CombatStop(true);

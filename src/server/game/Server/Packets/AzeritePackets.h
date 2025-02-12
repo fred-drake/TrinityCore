@@ -38,24 +38,6 @@ namespace WorldPackets
             uint64 XP = 0;
         };
 
-        class OpenHeartForge final : public ServerPacket
-        {
-        public:
-            OpenHeartForge() : ServerPacket(SMSG_OPEN_HEART_FORGE, 16) { }
-
-            WorldPacket const* Write() override;
-
-            ObjectGuid ForgeGUID;
-        };
-
-        class CloseHeartForge final : public ServerPacket
-        {
-        public:
-            CloseHeartForge() : ServerPacket(SMSG_CLOSE_HEART_FORGE, 0) { }
-
-            WorldPacket const* Write() override { return &_worldPacket; }
-        };
-
         class AzeriteEssenceUnlockMilestone final : public ClientPacket
         {
         public:
@@ -107,7 +89,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int32 Tier = 0;
+            uint8 Tier = 0;
             int32 AzeritePowerID = 0;
             uint8 ContainerSlot = 0;
             uint8 Slot = 0;
@@ -121,16 +103,6 @@ namespace WorldPackets
             WorldPacket const* Write() override;
 
             bool IsHeartEquipped = false;
-        };
-
-        class AzeriteRespecNPC final : public ServerPacket
-        {
-        public:
-            AzeriteRespecNPC(ObjectGuid npcGuid) : ServerPacket(SMSG_AZERITE_RESPEC_NPC, 1), NpcGUID(npcGuid) { }
-
-            WorldPacket const* Write() override;
-
-            ObjectGuid NpcGUID;
         };
     }
 }

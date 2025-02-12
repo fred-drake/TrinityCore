@@ -22,19 +22,23 @@
 #include "DB2Meta.h"
 #include "DBFilesClientList.h"
 #include "ExtractorDB2LoadInfo.h"
+#include "IteratorPair.h"
+#include "Locales.h"
 #include "MapDefines.h"
 #include "StringFormat.h"
+#include "Util.h"
 #include "adt.h"
 #include "wdt.h"
 #include <CascLib.h>
-#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <bitset>
-#include <cstdio>
 #include <deque>
 #include <fstream>
 #include <set>
 #include <unordered_map>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
@@ -108,6 +112,8 @@ float CONF_flat_liquid_delta_limit = 0.001f; // If max - min less this value - l
 uint32 CONF_Locale = 0;
 
 char const* CONF_Product = "wow";
+char const* CONF_Region = "eu";
+bool CONF_UseRemoteCasc = false;
 
 #define CASC_LOCALES_COUNT 17
 
@@ -146,7 +152,8 @@ void CreateDir(boost::filesystem::path const& path)
     if (fs::exists(path))
         return;
 
-    if (!fs::create_directory(path))
+    boost::system::error_code err;
+    if (!fs::create_directory(path, err) || err)
         throw std::runtime_error("Unable to create directory" + path.string());
 }
 
@@ -161,6 +168,8 @@ void Usage(char const* prg)
         "-f height stored as int (less map size but lost some accuracy) 1 by default\n"\
         "-l dbc locale\n"\
         "-p which installed product to open (wow/wowt/wow_beta)\n"\
+        "-c use remote casc\n"\
+        "-r set remote casc region - standard: eu\n"\
         "Example: %s -f 0 -i \"c:\\games\\game\"\n", prg, prg);
     exit(1);
 }
@@ -175,6 +184,8 @@ void HandleArgs(int argc, char* arg[])
         // f - use float to int conversion
         // h - limit minimum height
         // l - dbc locale
+        // c - use remote casc
+        // r - set casc remote region - standard: eu
         if (arg[c][0] != '-')
             Usage(arg[0]);
 
@@ -225,6 +236,18 @@ void HandleArgs(int argc, char* arg[])
                 else
                     Usage(arg[0]);
                 break;
+            case 'c':
+                if (c + 1 < argc)                            // all ok
+                    CONF_UseRemoteCasc = atoi(arg[c++ + 1]) != 0;
+                else
+                    Usage(arg[0]);
+                break;
+            case 'r':
+                if (c + 1 < argc && strlen(arg[c + 1]))      // all ok
+                    CONF_Region = arg[c++ + 1];
+                else
+                    Usage(arg[0]);
+                break;
             case 'h':
                 Usage(arg[0]);
                 break;
@@ -251,9 +274,9 @@ void ReadMapDBC()
 {
     printf("Read Map.db2 file...\n");
 
-    DB2CascFileSource source(CascStorage, MapLoadInfo::Instance()->Meta->FileDataId);
+    DB2CascFileSource source(CascStorage, MapLoadInfo::Instance.Meta->FileDataId);
     DB2FileLoader db2;
-    TryLoadDB2("Map.db2", &source, &db2, MapLoadInfo::Instance());
+    TryLoadDB2("Map.db2", &source, &db2, &MapLoadInfo::Instance);
 
     map_ids.reserve(db2.GetRecordCount());
     std::unordered_map<uint32, std::size_t> idToIndex;
@@ -287,7 +310,7 @@ void ReadMapDBC()
         }
     }
 
-    map_ids.erase(std::remove_if(map_ids.begin(), map_ids.end(), [](MapEntry const& map) { return !map.WdtFileDataId; }), map_ids.end());
+    std::erase_if(map_ids, [](MapEntry const& map) { return !map.WdtFileDataId; });
 
     printf("Done! (" SZFMTD " maps loaded)\n", map_ids.size());
 }
@@ -296,9 +319,9 @@ void ReadLiquidMaterialTable()
 {
     printf("Read LiquidMaterial.db2 file...\n");
 
-    DB2CascFileSource source(CascStorage, LiquidMaterialLoadInfo::Instance()->Meta->FileDataId);
+    DB2CascFileSource source(CascStorage, LiquidMaterialLoadInfo::Instance.Meta->FileDataId);
     DB2FileLoader db2;
-    TryLoadDB2("LiquidMaterial.db2", &source, &db2, LiquidMaterialLoadInfo::Instance());
+    TryLoadDB2("LiquidMaterial.db2", &source, &db2, &LiquidMaterialLoadInfo::Instance);
 
     for (uint32 x = 0; x < db2.GetRecordCount(); ++x)
     {
@@ -320,9 +343,9 @@ void ReadLiquidObjectTable()
 {
     printf("Read LiquidObject.db2 file...\n");
 
-    DB2CascFileSource source(CascStorage, LiquidObjectLoadInfo::Instance()->Meta->FileDataId);
+    DB2CascFileSource source(CascStorage, LiquidObjectLoadInfo::Instance.Meta->FileDataId);
     DB2FileLoader db2;
-    TryLoadDB2("LiquidObject.db2", &source, &db2, LiquidObjectLoadInfo::Instance());
+    TryLoadDB2("LiquidObject.db2", &source, &db2, &LiquidObjectLoadInfo::Instance);
 
     for (uint32 x = 0; x < db2.GetRecordCount(); ++x)
     {
@@ -344,9 +367,9 @@ void ReadLiquidTypeTable()
 {
     printf("Read LiquidType.db2 file...\n");
 
-    DB2CascFileSource source(CascStorage, LiquidTypeLoadInfo::Instance()->Meta->FileDataId);
+    DB2CascFileSource source(CascStorage, LiquidTypeLoadInfo::Instance.Meta->FileDataId);
     DB2FileLoader db2;
-    TryLoadDB2("LiquidType.db2", &source, &db2, LiquidTypeLoadInfo::Instance());
+    TryLoadDB2("LiquidType.db2", &source, &db2, &LiquidTypeLoadInfo::Instance);
 
     for (uint32 x = 0; x < db2.GetRecordCount(); ++x)
     {
@@ -369,9 +392,9 @@ bool ReadCinematicCameraDBC()
 {
     printf("Read CinematicCamera.db2 file...\n");
 
-    DB2CascFileSource source(CascStorage, CinematicCameraLoadInfo::Instance()->Meta->FileDataId);
+    DB2CascFileSource source(CascStorage, CinematicCameraLoadInfo::Instance.Meta->FileDataId);
     DB2FileLoader db2;
-    TryLoadDB2("CinematicCamera.db2", &source, &db2, CinematicCameraLoadInfo::Instance());
+    TryLoadDB2("CinematicCamera.db2", &source, &db2, &CinematicCameraLoadInfo::Instance);
 
     // get camera file list from DB2
     for (size_t i = 0; i < db2.GetRecordCount(); ++i)
@@ -475,9 +498,9 @@ bool ConvertADT(ChunkedFile& adt, std::string const& mapName, std::string const&
     bool hasHoles = false;
     bool hasFlightBox = false;
 
-    for (std::multimap<std::string, FileChunk*>::const_iterator itr = adt.chunks.lower_bound("MCNK"); itr != adt.chunks.upper_bound("MCNK"); ++itr)
+    for (auto const& [_, rawChunk] : Trinity::Containers::MapEqualRange(adt.chunks, "MCNK"))
     {
-        adt_MCNK* mcnk = itr->second->As<adt_MCNK>();
+        adt_MCNK* mcnk = rawChunk->As<adt_MCNK>();
 
         // Area data
         area_ids[mcnk->iy][mcnk->ix] = mcnk->areaid;
@@ -522,7 +545,7 @@ bool ConvertADT(ChunkedFile& adt, std::string const& mapName, std::string const&
         }
 
         // Get custom height
-        if (FileChunk* chunk = itr->second->GetSubChunk("MCVT"))
+        if (FileChunk* chunk = rawChunk->GetSubChunk("MCVT"))
         {
             adt_MCVT* mcvt = chunk->As<adt_MCVT>();
             // get V9 height map
@@ -551,7 +574,7 @@ bool ConvertADT(ChunkedFile& adt, std::string const& mapName, std::string const&
         // Liquid data
         if (mcnk->sizeMCLQ > 8)
         {
-            if (FileChunk* chunk = itr->second->GetSubChunk("MCLQ"))
+            if (FileChunk* chunk = rawChunk->GetSubChunk("MCLQ"))
             {
                 adt_MCLQ* liquid = chunk->As<adt_MCLQ>();
                 int count = 0;
@@ -1013,7 +1036,7 @@ bool ConvertADT(uint32 fileDataId, std::string const& mapName, std::string const
 {
     ChunkedFile adt;
 
-    if (!adt.loadFile(CascStorage, fileDataId, Trinity::StringFormat("Map %s grid [%u,%u]", mapName.c_str(), gx, gy)))
+    if (!adt.loadFile(CascStorage, fileDataId, Trinity::StringFormat("Map {} grid [{},{}]", mapName, gx, gy)))
         return false;
 
     return ConvertADT(adt, mapName, outputPath, gx, gy, build, ignoreDeepWater);
@@ -1067,7 +1090,7 @@ void ExtractMaps(uint32 build)
         // Loadup map grid data
         ChunkedFile wdt;
         std::bitset<(WDT_MAP_SIZE) * (WDT_MAP_SIZE)> existingTiles;
-        if (wdt.loadFile(CascStorage, map_ids[z].WdtFileDataId, Trinity::StringFormat("WDT for map %u", map_ids[z].Id), false))
+        if (wdt.loadFile(CascStorage, map_ids[z].WdtFileDataId, Trinity::StringFormat("WDT for map {}", map_ids[z].Id), false))
         {
             FileChunk* mphd = wdt.GetChunk("MPHD");
             FileChunk* main = wdt.GetChunk("MAIN");
@@ -1079,7 +1102,7 @@ void ExtractMaps(uint32 build)
                     if (!(main->As<wdt_MAIN>()->adt_list[y][x].flag & 0x1))
                         continue;
 
-                    outputFileName = Trinity::StringFormat("%s/maps/%04u_%02u_%02u.map", output_path.string().c_str(), map_ids[z].Id, y, x);
+                    outputFileName = Trinity::StringFormat("{}/maps/{:04}_{:02}_{:02}.map", output_path.string(), map_ids[z].Id, y, x);
                     bool ignoreDeepWater = IsDeepWaterIgnored(map_ids[z].Id, y, x);
                     if (mphd && mphd->As<wdt_MPHD>()->flags & 0x200)
                     {
@@ -1087,7 +1110,7 @@ void ExtractMaps(uint32 build)
                     }
                     else
                     {
-                        std::string storagePath = Trinity::StringFormat(R"(World\Maps\%s\%s_%u_%u.adt)", map_ids[z].Directory.c_str(), map_ids[z].Directory.c_str(), x, y);
+                        std::string storagePath = Trinity::StringFormat(R"(World\Maps\{}\{}_{}_{}.adt)", map_ids[z].Directory, map_ids[z].Directory, x, y);
                         existingTiles[y * WDT_MAP_SIZE + x] = ConvertADT(storagePath, map_ids[z].Name, outputFileName, y, x, build, ignoreDeepWater);
                     }
                 }
@@ -1098,7 +1121,7 @@ void ExtractMaps(uint32 build)
             }
         }
 
-        if (FILE* tileList = fopen(Trinity::StringFormat("%s/maps/%04u.tilelist", output_path.string().c_str(), map_ids[z].Id).c_str(), "wb"))
+        if (FILE* tileList = fopen(Trinity::StringFormat("{}/maps/{:04}.tilelist", output_path.string(), map_ids[z].Id).c_str(), "wb"))
         {
             fwrite(MapMagic.data(), 1, MapMagic.size(), tileList);
             fwrite(&MapVersionMagic, 1, sizeof(MapVersionMagic), tileList);
@@ -1200,7 +1223,7 @@ bool ExtractDB2File(uint32 fileDataId, char const* cascFileName, int locale, boo
     {
         DB2SectionHeader sectionHeader = db2.GetSectionHeader(i);
         if (sectionHeader.TactId && CascStorage->HasTactKey(sectionHeader.TactId))
-            sectionHeader.TactId = 0;
+            sectionHeader.TactId = DUMMY_KNOWN_TACT_ID;
 
         posAfterHeaders += fwrite(&sectionHeader, 1, sizeof(sectionHeader), output);
     }
@@ -1289,7 +1312,7 @@ void ExtractCameraFiles()
         std::unique_ptr<CASC::File> cameraFile(CascStorage->OpenFile(cameraFileDataId, CASC_LOCALE_NONE));
         if (cameraFile)
         {
-            boost::filesystem::path filePath = outputPath / Trinity::StringFormat("FILE%08X.xxx", cameraFileDataId);
+            boost::filesystem::path filePath = outputPath / Trinity::StringFormat("FILE{:08X}.xxx", cameraFileDataId);
 
             if (!boost::filesystem::exists(filePath))
                 if (ExtractFile(cameraFile.get(), filePath.string()))
@@ -1318,10 +1341,9 @@ void ExtractGameTables()
         { 1391662, "ArtifactLevelXP.txt" },
         { 1391663, "BarberShopCostBase.txt" },
         { 1391664, "BaseMp.txt" },
+        { 4494528, "BaseProfessionRatings.txt" },
         { 1391665, "BattlePetTypeDamageMod.txt" },
         { 1391666, "BattlePetXP.txt" },
-        { 1391667, "ChallengeModeDamage.txt" },
-        { 1391668, "ChallengeModeHealth.txt" },
         { 1391669, "CombatRatings.txt" },
         { 1391670, "CombatRatingsMultByILvl.txt" },
         { 1391671, "HonorLevel.txt" },
@@ -1330,6 +1352,7 @@ void ExtractGameTables()
         { 1726830, "ItemLevelSquish.txt" },
         { 1391643, "ItemSocketCostPerLevel.txt" },
         { 1391651, "NPCManaCostScaler.txt" },
+        { 4492239, "ProfessionRatings.txt" },
         { 1391659, "SandboxScaling.txt" },
         { 1391660, "SpellScaling.txt" },
         { 1980632, "StaminaMultByILvl.txt" },
@@ -1359,6 +1382,16 @@ bool OpenCascStorage(int locale)
 {
     try
     {
+        if (CONF_UseRemoteCasc)
+        {
+            boost::filesystem::path const cache_dir(boost::filesystem::canonical(input_path) / "CascCache");
+            CascStorage.reset(CASC::Storage::OpenRemote(cache_dir, WowLocaleToCascLocaleFlags[locale], CONF_Product, CONF_Region));
+            if (CascStorage)
+                return true;
+
+            printf("Unable to open remote casc fallback to local casc\n");
+        }
+
         boost::filesystem::path const storage_dir(boost::filesystem::canonical(input_path) / "Data");
         CascStorage.reset(CASC::Storage::Open(storage_dir, WowLocaleToCascLocaleFlags[locale], CONF_Product));
         if (!CascStorage)
@@ -1369,7 +1402,7 @@ bool OpenCascStorage(int locale)
 
         return true;
     }
-    catch (boost::filesystem::filesystem_error const& error)
+    catch (std::exception const& error)
     {
         printf("Error opening CASC storage: %s\n", error.what());
         return false;
@@ -1380,6 +1413,16 @@ uint32 GetInstalledLocalesMask()
 {
     try
     {
+        if (CONF_UseRemoteCasc)
+        {
+            boost::filesystem::path const cache_dir(boost::filesystem::canonical(input_path) / "CascCache");
+            std::unique_ptr<CASC::Storage> storage(CASC::Storage::OpenRemote(cache_dir, CASC_LOCALE_ALL_WOW, CONF_Product, CONF_Region));
+            if (storage)
+                return CASC_LOCALE_ALL_WOW;
+
+            printf("Unable to open remote casc fallback to local casc\n");
+        }
+
         boost::filesystem::path const storage_dir(boost::filesystem::canonical(input_path) / "Data");
         std::unique_ptr<CASC::Storage> storage(CASC::Storage::Open(storage_dir, CASC_LOCALE_ALL_WOW, CONF_Product));
         if (!storage)
@@ -1387,7 +1430,7 @@ uint32 GetInstalledLocalesMask()
 
         return storage->GetInstalledLocalesMask();
     }
-    catch (boost::filesystem::filesystem_error const& error)
+    catch (std::exception const& error)
     {
         printf("Unable to determine installed locales mask: %s\n", error.what());
     }
@@ -1397,6 +1440,9 @@ uint32 GetInstalledLocalesMask()
 
 static bool RetardCheck()
 {
+    if (CONF_UseRemoteCasc)
+        return true;
+
     try
     {
         boost::filesystem::path storageDir(boost::filesystem::canonical(input_path) / "Data");
@@ -1426,6 +1472,10 @@ static bool RetardCheck()
 
 int main(int argc, char * arg[])
 {
+    Trinity::VerifyOsVersion();
+
+    Trinity::Locale::Init();
+
     Trinity::Banner::Show("Map & DBC Extractor", [](char const* text) { printf("%s\n", text); }, nullptr);
 
     PrintProgress = isatty(fileno(stdout));
@@ -1517,3 +1567,9 @@ int main(int argc, char * arg[])
 
     return 0;
 }
+
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
+#include "WheatyExceptionReport.h"
+// must be at end of file because of init_seg pragma
+INIT_CRASH_HANDLER();
+#endif

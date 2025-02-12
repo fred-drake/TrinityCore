@@ -40,7 +40,9 @@ enum Willix
     SAY_END                     = 10,
 
     QUEST_WILLIX_THE_IMPORTER   = 1144,
-    ENTRY_BOAR                  = 4514
+    ENTRY_BOAR                  = 4514,
+
+    PATH_ESCORT_WILLIX          = 36066
 };
 
 class npc_willix : public CreatureScript
@@ -52,11 +54,12 @@ public:
     {
         npc_willixAI(Creature* creature) : EscortAI(creature) { }
 
-        void QuestAccept(Player* player, Quest const* quest) override
+        void OnQuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_WILLIX_THE_IMPORTER)
             {
-                Start(true, false, player->GetGUID());
+                LoadPath(PATH_ESCORT_WILLIX);
+                Start(true, player->GetGUID());
                 Talk(SAY_READY, player);
                 me->SetFaction(FACTION_ESCORTEE_N_NEUTRAL_PASSIVE);
             }
@@ -103,7 +106,7 @@ public:
                     break;
                 case 45:
                     Talk(SAY_WIN, player);
-                    me->AddNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
+                    me->SetNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
                     player->GroupEventHappens(QUEST_WILLIX_THE_IMPORTER, me);
                     break;
                 case 46:
@@ -225,7 +228,6 @@ public:
                 DoFindNewTubber();
         }
 
-
         bool IsMovementActive;
         ObjectGuid TargetTubberGUID;
     };
@@ -238,8 +240,6 @@ class spell_snufflenose_command : public SpellScriptLoader
 
         class spell_snufflenose_commandSpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_snufflenose_commandSpellScript);
-
             void HandleEffect(SpellEffIndex /*effIndex*/)
             {
                 if (Creature* target = GetHitCreature())

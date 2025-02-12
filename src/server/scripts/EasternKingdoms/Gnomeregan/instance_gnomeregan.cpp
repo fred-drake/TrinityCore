@@ -20,9 +20,16 @@
 #include "GameObject.h"
 #include "gnomeregan.h"
 #include "InstanceScript.h"
-#include "Log.h"
 #include "Map.h"
-#include <sstream>
+
+static constexpr DungeonEncounterData Encounters[] =
+{
+    { DATA_BLASTMASTER_EVENT, { { 379 } } },
+    { DATA_VICIOUS_FALLOUT  , { { 378 } } },
+    { DATA_ELECTROCUTIONER  , { { 380 } } },
+    { DATA_CROWD_PUMMELER   , { { 381 } } },
+    { DATA_THERMAPLUGG      , { { 382 } } },
+};
 
 class instance_gnomeregan : public InstanceMapScript
 {
@@ -40,6 +47,7 @@ public:
         {
             SetHeaders(DataHeader);
             SetBossNumber(MAX_ENCOUNTER);
+            LoadDungeonEncounterData(Encounters);
         }
 
         ObjectGuid uiCaveInLeftGUID;
