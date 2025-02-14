@@ -19,11 +19,10 @@
 #define CriteriaHandler_h__
 
 #include "Common.h"
-#include "DatabaseEnvFwd.h"
 #include "DBCEnums.h"
 #include "Duration.h"
 #include "ObjectGuid.h"
-#include <map>
+#include <span>
 #include <unordered_map>
 #include <vector>
 #include <ctime>
@@ -70,8 +69,8 @@ struct CriteriaTree
     CriteriaTreeEntry const* Entry = nullptr;
     AchievementEntry const* Achievement = nullptr;
     ScenarioStepEntry const* ScenarioStep = nullptr;
-    struct QuestObjective const* QuestObjective = nullptr;
-    struct Criteria const* Criteria = nullptr;
+    ::QuestObjective const* QuestObjective = nullptr;
+    ::Criteria const* Criteria = nullptr;
     std::vector<CriteriaTree const*> Children;
 };
 
@@ -253,7 +252,6 @@ private:
     std::vector<CriteriaData> _storage;
 };
 
-typedef std::map<uint32, CriteriaDataSet> CriteriaDataMap;
 typedef std::unordered_map<uint32, CriteriaProgress> CriteriaProgressMap;
 
 enum ProgressType
@@ -269,19 +267,25 @@ public:
     CriteriaHandler();
     virtual ~CriteriaHandler();
 
+    CriteriaHandler(CriteriaHandler const& right) = delete;
+    CriteriaHandler(CriteriaHandler&& right) = delete;
+    CriteriaHandler& operator=(CriteriaHandler const& right) = delete;
+    CriteriaHandler& operator=(CriteriaHandler&& right) = delete;
+
     virtual void Reset();
 
     void UpdateCriteria(CriteriaType type, uint64 miscValue1 = 0, uint64 miscValue2 = 0, uint64 miscValue3 = 0, WorldObject const* ref = nullptr, Player* referencePlayer = nullptr);
 
     virtual void SendAllData(Player const* receiver) const = 0;
 
-    void UpdateTimedCriteria(uint32 timeDiff);
-    void StartCriteriaTimer(CriteriaStartEvent startEvent, uint32 entry, uint32 timeLost = 0);
-    void RemoveCriteriaTimer(CriteriaStartEvent startEvent, uint32 entry);   // used for quest and scripted timed s
+    void UpdateTimedCriteria(Milliseconds timeDiff);
+    void StartCriteria(CriteriaStartEvent startEvent, uint32 entry, Milliseconds timeLost = Milliseconds::zero());
+    virtual void FailCriteria(CriteriaFailEvent failEvent, uint32 asset);
 
 protected:
     virtual void SendCriteriaUpdate(Criteria const* criteria, CriteriaProgress const* progress, Seconds timeElapsed, bool timedCompleted) const = 0;
 
+    void UpdateCriteria(Criteria const* criteria, uint64 miscValue1 = 0, uint64 miscValue2 = 0, uint64 miscValue3 = 0, WorldObject const* ref = nullptr, Player* referencePlayer = nullptr);
     CriteriaProgress* GetCriteriaProgress(Criteria const* entry);
     void SetCriteriaProgress(Criteria const* criteria, uint64 changeValue, Player* referencePlayer, ProgressType progressType = PROGRESS_SET);
     void RemoveCriteriaProgress(Criteria const* criteria);
@@ -308,15 +312,20 @@ protected:
     virtual CriteriaList const& GetCriteriaByType(CriteriaType type, uint32 asset) const = 0;
 
     CriteriaProgressMap _criteriaProgress;
-    std::map<uint32, uint32 /*ms time left*/> _timeCriteriaTrees;
+    std::unordered_map<uint32 /*criteriaID*/, Milliseconds /*time left*/> _startedCriteria;
 };
 
 class TC_GAME_API CriteriaMgr
 {
-    CriteriaMgr() { }
+    CriteriaMgr();
     ~CriteriaMgr();
 
 public:
+    CriteriaMgr(CriteriaMgr const& right) = delete;
+    CriteriaMgr(CriteriaMgr&& right) = delete;
+    CriteriaMgr& operator=(CriteriaMgr const& right) = delete;
+    CriteriaMgr& operator=(CriteriaMgr&& right) = delete;
+
     static char const* GetCriteriaTypeString(CriteriaType type);
     static char const* GetCriteriaTypeString(uint32 type);
 
@@ -329,10 +338,7 @@ public:
         return _guildCriteriasByType[size_t(type)];
     }
 
-    CriteriaList const& GetScenarioCriteriaByType(CriteriaType type) const
-    {
-        return _scenarioCriteriasByType[size_t(type)];
-    }
+    CriteriaList const& GetScenarioCriteriaByTypeAndScenario(CriteriaType type, uint32 scenarioId) const;
 
     CriteriaList const& GetQuestObjectiveCriteriaByType(CriteriaType type) const
     {
@@ -345,20 +351,15 @@ public:
         return itr != _criteriaTreeByCriteria.end() ? &itr->second : nullptr;
     }
 
-    CriteriaList const& GetTimedCriteriaByType(CriteriaStartEvent startEvent) const
-    {
-        return _criteriasByTimedType[size_t(startEvent)];
-    }
+    std::unordered_map<int32, CriteriaList> const& GetCriteriaByStartEvent(CriteriaStartEvent startEvent) const;
+    CriteriaList const* GetCriteriaByStartEvent(CriteriaStartEvent startEvent, int32 asset) const;
 
-    CriteriaList const* GetCriteriaByFailEvent(CriteriaFailEvent condition, int32 asset)
-    {
-        auto itr = _criteriasByFailEvent[size_t(condition)].find(asset);
-        return itr != _criteriasByFailEvent[size_t(condition)].end() ? &itr->second : nullptr;
-    }
+    std::unordered_map<int32, CriteriaList> const& GetCriteriaByFailEvent(CriteriaFailEvent failEvent) const;
+    CriteriaList const* GetCriteriaByFailEvent(CriteriaFailEvent failEvent, int32 asset) const;
 
     CriteriaDataSet const* GetCriteriaDataSet(Criteria const* Criteria) const
     {
-        CriteriaDataMap::const_iterator iter = _criteriaDataMap.find(Criteria->ID);
+        auto iter = _criteriaDataMap.find(Criteria->ID);
         return iter != _criteriaDataMap.end() ? &iter->second : nullptr;
     }
 
@@ -396,8 +397,10 @@ public:
     Criteria const* GetCriteria(uint32 criteriaId) const;
     ModifierTreeNode const* GetModifierTree(uint32 modifierTreeId) const;
 
+    static std::span<CriteriaType const> GetRetroactivelyUpdateableCriteriaTypes();
+
 private:
-    CriteriaDataMap _criteriaDataMap;
+    std::unordered_map<uint32, CriteriaDataSet> _criteriaDataMap;
 
     std::unordered_map<uint32, CriteriaTree*> _criteriaTrees;
     std::unordered_map<uint32, Criteria*> _criteria;
@@ -406,13 +409,14 @@ private:
     std::unordered_map<uint32, CriteriaTreeList> _criteriaTreeByCriteria;
 
     // store criterias by type to speed up lookup
+    static CriteriaList const EmptyCriteriaList;
     CriteriaList _criteriasByType[size_t(CriteriaType::Count)];
     CriteriaListByAsset _criteriasByAsset[size_t(CriteriaType::Count)];
     CriteriaList _guildCriteriasByType[size_t(CriteriaType::Count)];
-    CriteriaList _scenarioCriteriasByType[size_t(CriteriaType::Count)];
+    CriteriaListByAsset _scenarioCriteriasByTypeAndScenarioId[size_t(CriteriaType::Count)];
     CriteriaList _questObjectiveCriteriasByType[size_t(CriteriaType::Count)];
 
-    CriteriaList _criteriasByTimedType[size_t(CriteriaStartEvent::Count)];
+    std::unordered_map<int32, CriteriaList> _criteriasByStartEvent[size_t(CriteriaStartEvent::Count)];
     std::unordered_map<int32, CriteriaList> _criteriasByFailEvent[size_t(CriteriaFailEvent::Count)];
 };
 

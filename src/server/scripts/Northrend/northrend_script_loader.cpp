@@ -35,12 +35,14 @@ void AddSC_boss_amanitar();
 void AddSC_boss_jedoga_shadowseeker();
 void AddSC_boss_volazj();
 void AddSC_instance_ahnkahet();
+void AddSC_ahnkahet();
 // Drak'Tharon Keep
 void AddSC_boss_trollgore();
 void AddSC_boss_novos();
 void AddSC_boss_king_dred();
 void AddSC_boss_tharon_ja();
 void AddSC_instance_drak_tharon_keep();
+void AddSC_drak_tharon_keep();
 // Trial of the Champion
 void AddSC_boss_argent_challenge();
 void AddSC_boss_black_knight();
@@ -95,7 +97,7 @@ void AddSC_boss_sartharion();
 void AddSC_obsidian_sanctum();
 void AddSC_instance_obsidian_sanctum();
 // Ulduar: Halls of Lightning
-void AddSC_boss_bjarngrim();
+void AddSC_boss_general_bjarngrim();
 void AddSC_boss_loken();
 void AddSC_boss_ionar();
 void AddSC_boss_volkhan();
@@ -122,6 +124,7 @@ void AddSC_boss_thorim();
 void AddSC_boss_yogg_saron();
 void AddSC_boss_algalon_the_observer();
 void AddSC_instance_ulduar();
+void AddSC_ulduar();
 // Utgarde Keep - Utgarde Keep
 void AddSC_boss_keleseth();
 void AddSC_boss_skarvald_dalronn();
@@ -134,6 +137,7 @@ void AddSC_boss_palehoof();
 void AddSC_boss_skadi();
 void AddSC_boss_ymiron();
 void AddSC_instance_utgarde_pinnacle();
+void AddSC_utgarde_pinnacle();
 // Vault of Archavon
 void AddSC_boss_archavon();
 void AddSC_boss_emalon();
@@ -190,9 +194,6 @@ void AddSC_boss_baltharus_the_warborn();
 void AddSC_boss_saviana_ragefire();
 void AddSC_boss_general_zarithrian();
 void AddSC_boss_halion();
-// Isle of Conquest
-void AddSC_isle_of_conquest();
-void AddSC_boss_ioc_horde_alliance();
 
 void AddSC_dalaran();
 void AddSC_borean_tundra();
@@ -224,6 +225,7 @@ void AddNorthrendScripts()
     AddSC_boss_jedoga_shadowseeker();
     AddSC_boss_volazj();
     AddSC_instance_ahnkahet();
+    AddSC_ahnkahet();
     // Azjol-Nerub - Azjol-Nerub
     AddSC_boss_krik_thir();
     AddSC_boss_hadronox();
@@ -235,6 +237,7 @@ void AddNorthrendScripts()
     AddSC_boss_king_dred();
     AddSC_boss_tharon_ja();
     AddSC_instance_drak_tharon_keep();
+    AddSC_drak_tharon_keep();
     // Trial of the Champion
     AddSC_boss_argent_challenge();
     AddSC_boss_black_knight();
@@ -289,7 +292,7 @@ void AddNorthrendScripts()
     AddSC_obsidian_sanctum();
     AddSC_instance_obsidian_sanctum();
     // Halls of Lightning
-    AddSC_boss_bjarngrim();
+    AddSC_boss_general_bjarngrim();
     AddSC_boss_loken();
     AddSC_boss_ionar();
     AddSC_boss_volkhan();
@@ -316,6 +319,7 @@ void AddNorthrendScripts()
     AddSC_boss_yogg_saron();
     AddSC_boss_algalon_the_observer();
     AddSC_instance_ulduar();
+    AddSC_ulduar();
     // Utgarde Keep - Utgarde Keep
     AddSC_boss_keleseth();
     AddSC_boss_skarvald_dalronn();
@@ -328,6 +332,7 @@ void AddNorthrendScripts()
     AddSC_boss_skadi();
     AddSC_boss_ymiron();
     AddSC_instance_utgarde_pinnacle();
+    AddSC_utgarde_pinnacle();
     // Vault of Archavon
     AddSC_boss_archavon();
     AddSC_boss_emalon();
@@ -384,9 +389,6 @@ void AddNorthrendScripts()
     AddSC_boss_saviana_ragefire();
     AddSC_boss_general_zarithrian();
     AddSC_boss_halion();
-    // Isle of Conquest
-    AddSC_isle_of_conquest();
-    AddSC_boss_ioc_horde_alliance();
 
     AddSC_dalaran();
     AddSC_borean_tundra();

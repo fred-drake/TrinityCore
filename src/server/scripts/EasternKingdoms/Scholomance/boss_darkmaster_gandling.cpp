@@ -131,7 +131,6 @@ class boss_darkmaster_gandling : public CreatureScript
                     if (me->HasUnitState(UNIT_STATE_CASTING))
                         return;
                 }
-                DoMeleeAttackIfReady();
             }
         };
 
@@ -162,6 +161,7 @@ enum SPSpells
     SPELL_SHADOW_PORTAL_VAULTOFTHERAVENIAN     = 17948
 };
 
+// 17950 - Shadow Portal
 class spell_shadow_portal : public SpellScriptLoader
 {
     public:
@@ -169,8 +169,6 @@ class spell_shadow_portal : public SpellScriptLoader
 
         class spell_shadow_portal_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_shadow_portal_SpellScript);
-
             bool Load() override
             {
                 _instance = GetCaster()->GetInstanceScript();
@@ -245,8 +243,6 @@ Position const SummonPos[18] =
 {
     // Hall of Secrects
 
-
-
     // The Hall of the damned
     { 177.9624f, -68.23893f, 84.95197f, 3.228859f },
     { 183.7705f, -61.43489f, 84.92424f, 5.148721f },
@@ -265,8 +261,6 @@ Position const SummonPos[18] =
     { 185.6157f, -42.91200f, 75.4812f, 4.45059f },
     // Vault of the Ravenian
 
-
-
 };
 
 enum Creatures
@@ -284,6 +278,7 @@ enum ScriptEventId
     SPELL_EVENT_VAULTOFTHERAVENIAN     = 5623
 };
 
+// 17863, 17939, 17943, 17944, 17946, 17948 - Shadow Portal
 class spell_shadow_portal_rooms : public SpellScriptLoader
 {
     public:
@@ -291,8 +286,6 @@ class spell_shadow_portal_rooms : public SpellScriptLoader
 
         class spell_shadow_portal_rooms_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_shadow_portal_rooms_SpellScript);
-
             bool Load() override
             {
                 _instance = GetCaster()->GetInstanceScript();

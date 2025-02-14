@@ -21,74 +21,79 @@
  */
 
 #include "ScriptMgr.h"
+#include "Creature.h"
 #include "PassiveAI.h"
 #include "PetAI.h"
-#include "ScriptedCreature.h"
+#include "TemporarySummon.h"
 
 enum PriestSpells
 {
-    SPELL_PRIEST_GLYPH_OF_SHADOWFIEND       = 58228,
-    SPELL_PRIEST_SHADOWFIEND_DEATH          = 57989,
+    SPELL_PRIEST_ATONEMENT                  = 81749,
+    SPELL_PRIEST_ATONEMENT_PASSIVE          = 195178,
+    SPELL_PRIEST_DIVINE_IMAGE_SPELL_CHECK   = 405216,
+    SPELL_PRIEST_INVOKE_THE_NAARU           = 196687,
     SPELL_PRIEST_LIGHTWELL_CHARGES          = 59907
 };
 
-class npc_pet_pri_lightwell : public CreatureScript
+// 198236 - Divine Image
+struct npc_pet_pri_divine_image : public PassiveAI
 {
-    public:
-        npc_pet_pri_lightwell() : CreatureScript("npc_pet_pri_lightwell") { }
+    npc_pet_pri_divine_image(Creature* creature) : PassiveAI(creature) { }
 
-        struct npc_pet_pri_lightwellAI : public PassiveAI
-        {
-            npc_pet_pri_lightwellAI(Creature* creature) : PassiveAI(creature)
-            {
-                DoCast(me, SPELL_PRIEST_LIGHTWELL_CHARGES, false);
-            }
+    void IsSummonedBy(WorldObject* summoner) override
+    {
+        me->CastSpell(me, SPELL_PRIEST_INVOKE_THE_NAARU);
 
-            void EnterEvadeMode(EvadeReason /*why*/) override
-            {
-                if (!me->IsAlive())
-                    return;
+        if (me->ToTempSummon()->IsGuardian() && summoner->IsUnit())
+            static_cast<Guardian*>(me)->SetBonusDamage(summoner->ToUnit()->SpellBaseHealingBonusDone(SPELL_SCHOOL_MASK_HOLY));
+    }
 
-                me->CombatStop(true);
-                EngagementOver();
-                me->ResetPlayerDamageReq();
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return new npc_pet_pri_lightwellAI(creature);
-        }
+    void OnDespawn() override
+    {
+        if (Unit* owner = me->GetOwner())
+            owner->RemoveAura(SPELL_PRIEST_DIVINE_IMAGE_SPELL_CHECK);
+    }
 };
 
-class npc_pet_pri_shadowfiend : public CreatureScript
+// 189820 - Lightwell
+struct npc_pet_pri_lightwell : public PassiveAI
 {
-    public:
-        npc_pet_pri_shadowfiend() : CreatureScript("npc_pet_pri_shadowfiend") { }
+    npc_pet_pri_lightwell(Creature* creature) : PassiveAI(creature)
+    {
+        DoCast(me, SPELL_PRIEST_LIGHTWELL_CHARGES, false);
+    }
 
-        struct npc_pet_pri_shadowfiendAI : public PetAI
-        {
-            npc_pet_pri_shadowfiendAI(Creature* creature) : PetAI(creature) { }
+    void EnterEvadeMode(EvadeReason /*why*/) override
+    {
+        if (!me->IsAlive())
+            return;
 
-            void IsSummonedBy(WorldObject* summonerWO) override
-            {
-                Unit* summoner = summonerWO->ToUnit();
-                if (!summoner)
-                    return;
+        me->CombatStop(true);
+        EngagementOver();
+        me->ResetPlayerDamageReq();
+    }
+};
 
-                if (summoner->HasAura(SPELL_PRIEST_GLYPH_OF_SHADOWFIEND))
-                    DoCastAOE(SPELL_PRIEST_SHADOWFIEND_DEATH);
-            }
-        };
+// 19668 - Shadowfiend
+// 62982 - Mindbender
+struct npc_pet_pri_shadowfiend_mindbender : public PetAI
+{
+    npc_pet_pri_shadowfiend_mindbender(Creature* creature) : PetAI(creature) { }
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return new npc_pet_pri_shadowfiendAI(creature);
-        }
+    void IsSummonedBy(WorldObject* summonerWO) override
+    {
+        Unit* summoner = summonerWO->ToUnit();
+        if (!summoner)
+            return;
+
+        if (summoner->HasAura(SPELL_PRIEST_ATONEMENT))
+            DoCastSelf(SPELL_PRIEST_ATONEMENT_PASSIVE, TRIGGERED_FULL_MASK);
+    }
 };
 
 void AddSC_priest_pet_scripts()
 {
-    new npc_pet_pri_lightwell();
-    new npc_pet_pri_shadowfiend();
+    RegisterCreatureAI(npc_pet_pri_divine_image);
+    RegisterCreatureAI(npc_pet_pri_lightwell);
+    RegisterCreatureAI(npc_pet_pri_shadowfiend_mindbender);
 }

@@ -23,7 +23,6 @@
 #include <G3D/Array.h>
 #include <G3D/Set.h>
 
-
 template<class T, class BoundsFunc = BoundsTrait<T> >
 class BIHWrap
 {
@@ -95,7 +94,7 @@ public:
         m_objects_to_push.getMembers(m_objects);
         //assert that m_obj2Idx has all the keys
 
-        m_tree.build(m_objects, BoundsFunc::getBounds2);
+        m_tree.build(m_objects, BoundsFunc());
     }
 
     template<typename RayCallback>

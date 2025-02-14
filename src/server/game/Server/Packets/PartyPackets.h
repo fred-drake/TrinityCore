@@ -50,7 +50,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             uint32 ProposedRoles = 0;
             std::string TargetName;
             std::string TargetRealm;
@@ -64,13 +64,13 @@ namespace WorldPackets
 
             WorldPacket const* Write() override;
 
-            void Initialize(Player* const inviter, int32 proposedRoles, bool canAccept);
+            void Initialize(Player const* inviter, int32 proposedRoles, bool canAccept);
 
-            bool MightCRZYou = false;
-            bool MustBeBNetFriend = false;
+            bool ShouldSquelch = false;
             bool AllowMultipleRoles = false;
             bool QuestSessionActive = false;
-            uint16 Unk1 = 0;
+            bool IsCrossFaction = false;
+            uint16 InviterCfgRealmID = 0;
 
             bool CanAccept = false;
 
@@ -82,9 +82,10 @@ namespace WorldPackets
 
             // Realm
             bool IsXRealm = false;
+            bool IsXNativeRealm = false;
 
             // Lfg
-            uint32 ProposedRoles = 0;
+            uint8 ProposedRoles = 0;
             uint32 LfgCompletedMask = 0;
             std::vector<uint32> LfgSlots;
         };
@@ -96,9 +97,9 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             bool Accept = false;
-            Optional<uint32> RolesDesired;
+            Optional<uint8> RolesDesired;
         };
 
         class PartyUninvite final : public ClientPacket
@@ -108,7 +109,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid TargetGUID;
             std::string Reason;
         };
@@ -138,13 +139,13 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid TargetGUID;
         };
 
         struct PartyMemberPhase
         {
-            uint16 Flags = 0u;
+            uint32 Flags = 0u;
             uint16 Id = 0u;
         };
 
@@ -177,9 +178,9 @@ namespace WorldPackets
 
         struct CTROptions
         {
-            uint32 ContentTuningConditionMask = 0;
-            int32 Unused901 = 0;
-            uint32 ExpansionLevelMask = 0;
+            uint32 ConditionalFlags = 0;
+            int32 FactionGroup = 0;
+            uint32 ChromieTimeExpansionMask = 0;
         };
 
         struct PartyMemberStats
@@ -236,7 +237,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid TargetGUID;
         };
 
@@ -247,9 +248,9 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid TargetGUID;
-            int32 Role = 0;
+            uint8 Role = 0;
         };
 
         class RoleChangedInform final : public ServerPacket
@@ -259,11 +260,11 @@ namespace WorldPackets
 
             WorldPacket const* Write() override;
 
-            int8 PartyIndex = 0;
+            uint8 PartyIndex = 0;
             ObjectGuid From;
             ObjectGuid ChangedUnit;
-            int32 OldRole = 0;
-            int32 NewRole = 0;
+            uint8 OldRole = 0;
+            uint8 NewRole = 0;
         };
 
         class LeaveGroup final : public ClientPacket
@@ -273,7 +274,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
         };
 
         class SetLootMethod final : public ClientPacket
@@ -283,7 +284,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid LootMasterGUID;
             uint8 LootMethod = 0u;
             uint32 LootThreshold = 0u;
@@ -296,7 +297,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             float PositionX = 0.f;
             float PositionY = 0.f;
         };
@@ -320,7 +321,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid Target;
             int8 Symbol = 0;
         };
@@ -366,7 +367,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
         };
 
         class SetAssistantLeader final : public ClientPacket
@@ -377,7 +378,7 @@ namespace WorldPackets
             void Read() override;
 
             ObjectGuid Target;
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             bool Apply = false;
         };
 
@@ -388,7 +389,7 @@ namespace WorldPackets
 
             void Read() override;
             uint8 Assignment = 0;
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             ObjectGuid Target;
             bool Set = false;
         };
@@ -400,7 +401,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
         };
 
         class ReadyCheckStarted final : public ServerPacket
@@ -423,7 +424,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             bool IsReady = false;
         };
 
@@ -475,7 +476,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
         };
 
         class RolePollInform final : public ServerPacket
@@ -505,13 +506,14 @@ namespace WorldPackets
             ObjectGuid GUID;
             std::string Name;
             std::string VoiceStateID;   // same as bgs.protocol.club.v1.MemberVoiceState.id
-            uint8 Class = 0;
-            uint8 Status = 0u;
+            uint8 Class = 0u;
             uint8 Subgroup = 0u;
             uint8 Flags = 0u;
             uint8 RolesAssigned = 0u;
+            uint8 FactionGroup = 0u;
             bool FromSocialQueue = false;
             bool VoiceChatSilenced = false;
+            bool Connected = false;
         };
 
         struct PartyLFGInfo
@@ -555,9 +557,12 @@ namespace WorldPackets
 
             ObjectGuid PartyGUID;
             ObjectGuid LeaderGUID;
+            uint8 LeaderFactionGroup = 0;
 
             int32 MyIndex = 0;
             int32 SequenceNum = 0;
+
+            RestrictPingsTo PingRestriction = RestrictPingsTo::None;
 
             std::vector<PartyPlayerInfo> PlayerList;
 
@@ -573,7 +578,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             bool EveryoneIsAssistant = false;
         };
 
@@ -585,7 +590,7 @@ namespace WorldPackets
             void Read() override;
 
             ObjectGuid TargetGUID;
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
             uint8 NewSubGroup = 0u;
         };
 
@@ -598,7 +603,7 @@ namespace WorldPackets
 
             ObjectGuid FirstTarget;
             ObjectGuid SecondTarget;
-            int8 PartyIndex = 0;
+            Optional<uint8> PartyIndex;
         };
 
         class ClearRaidMarker final : public ClientPacket
@@ -641,6 +646,113 @@ namespace WorldPackets
             GroupDestroyed() : ServerPacket(SMSG_GROUP_DESTROYED, 0) { }
 
             WorldPacket const* Write() override { return &_worldPacket; }
+        };
+
+        class BroadcastSummonCast final : public ServerPacket
+        {
+        public:
+            BroadcastSummonCast() : ServerPacket(SMSG_BROADCAST_SUMMON_CAST, 16) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid Target;
+        };
+
+        class BroadcastSummonResponse final : public ServerPacket
+        {
+        public:
+            BroadcastSummonResponse() : ServerPacket(SMSG_BROADCAST_SUMMON_RESPONSE, 16 + 1) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid Target;
+            bool Accepted = false;
+        };
+
+        class SetRestrictPingsToAssistants final : public ClientPacket
+        {
+        public:
+            explicit SetRestrictPingsToAssistants(WorldPacket&& packet) : ClientPacket(CMSG_SET_RESTRICT_PINGS_TO_ASSISTANTS, std::move(packet)) { }
+
+            void Read() override;
+
+            Optional<uint8> PartyIndex;
+            RestrictPingsTo RestrictTo = RestrictPingsTo::None;
+        };
+
+        class SendPingUnit final : public ClientPacket
+        {
+        public:
+            explicit SendPingUnit(WorldPacket&& packet) : ClientPacket(CMSG_SEND_PING_UNIT, std::move(packet)) { }
+
+            void Read() override;
+
+            ObjectGuid SenderGUID;
+            ObjectGuid TargetGUID;
+            PingSubjectType Type = PingSubjectType::Max;
+            uint32 PinFrameID = 0;
+            Duration<Milliseconds, int32> PingDuration;
+            Optional<uint32> CreatureID;
+            Optional<uint32> SpellOverrideNameID;
+        };
+
+        class ReceivePingUnit final : public ServerPacket
+        {
+        public:
+            ReceivePingUnit() : ServerPacket(SMSG_RECEIVE_PING_UNIT, 16 + 16 + 1 + 4) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid SenderGUID;
+            ObjectGuid TargetGUID;
+            PingSubjectType Type = PingSubjectType::Max;
+            uint32 PinFrameID = 0;
+            Duration<Milliseconds, int32> PingDuration;
+            Optional<uint32> CreatureID;
+            Optional<uint32> SpellOverrideNameID;
+        };
+
+        class SendPingWorldPoint final : public ClientPacket
+        {
+        public:
+            explicit SendPingWorldPoint(WorldPacket&& packet) : ClientPacket(CMSG_SEND_PING_WORLD_POINT, std::move(packet)) { }
+
+            void Read() override;
+
+            ObjectGuid SenderGUID;
+            uint32 MapID = 0;
+            TaggedPosition<Position::XYZ> Point;
+            PingSubjectType Type = PingSubjectType::Max;
+            uint32 PinFrameID = 0;
+            ObjectGuid Transport;
+            Duration<Milliseconds, int32> PingDuration;
+        };
+
+        class ReceivePingWorldPoint final : public ServerPacket
+        {
+        public:
+            ReceivePingWorldPoint() : ServerPacket(SMSG_RECEIVE_PING_WORLD_POINT, 16 + 4 + 4 * 3 + 1 + 4) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid SenderGUID;
+            uint32 MapID = 0;
+            TaggedPosition<Position::XYZ> Point;
+            PingSubjectType Type = PingSubjectType::Max;
+            uint32 PinFrameID = 0;
+            Duration<Milliseconds, int32> PingDuration;
+            ObjectGuid Transport;
+        };
+
+        class CancelPingPin final : public ServerPacket
+        {
+        public:
+            CancelPingPin() : ServerPacket(SMSG_CANCEL_PING_PIN, 16 + 4) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid SenderGUID;
+            uint32 PinFrameID = 0;
         };
     }
 }

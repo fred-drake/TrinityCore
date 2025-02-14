@@ -69,7 +69,7 @@ namespace WorldPackets
 
             WorldPacket const* Write() override;
 
-            std::array<uint8, 16> Challenge = { };
+            std::array<uint8, 32> Challenge = { };
             std::array<uint32, 8> DosChallenge = { };
             uint8 DosZeroBits = 0;
         };
@@ -88,7 +88,7 @@ namespace WorldPackets
             uint32 RegionID = 0;
             uint32 BattlegroupID = 0;
             uint32 RealmID = 0;
-            std::array<uint8, 16> LocalChallenge;
+            std::array<uint8, 32> LocalChallenge;
             std::array<uint8, DigestLength> Digest;
             uint64 DosResponse = 0;
             std::string RealmJoinTicket;
@@ -102,7 +102,9 @@ namespace WorldPackets
         {
             uint32 WaitCount = 0; ///< position of the account in the login queue
             uint32 WaitTime = 0; ///< Wait time in login queue in minutes, if sent queued and this value is 0 client displays "unknown time"
+            int32 AllowedFactionGroupForCharacterCreate = 0;
             bool HasFCM = false; ///< true if the account has a forced character migration pending. @todo implement
+            bool CanCreateOnlyIfExisting = false; ///< Can create characters on realm only if player has other existing characters there
         };
 
         struct VirtualRealmNameInfo
@@ -134,10 +136,18 @@ namespace WorldPackets
             {
                 struct GameTime
                 {
-                    uint32 BillingPlan = 0;
-                    uint32 TimeRemain = 0;
-                    uint32 Unknown735 = 0;
-                    bool InGameRoom = false;
+                    uint32 BillingType = 0;
+                    uint32 MinutesRemaining = 0;
+                    uint32 RealBillingType = 0;
+                    bool IsInIGR = false;
+                    bool IsPaidForByIGR = false;
+                    bool IsCAISEnabled = false;
+                };
+
+                struct NewBuild
+                {
+                    std::array<uint8, 16> NewBuildKey = { };
+                    std::array<uint8, 16> SomeKey = { };
                 };
 
                 AuthSuccessInfo() { } // work around clang bug https://gcc.gnu.org/bugzilla/show_bug.cgi?id=101227
@@ -162,7 +172,8 @@ namespace WorldPackets
                 bool ForceCharacterTemplate = false; ///< forces the client to always use a character template when creating a new character. @see Templates. @todo implement
                 Optional<uint16> NumPlayersHorde; ///< number of horde players in this realm. @todo implement
                 Optional<uint16> NumPlayersAlliance; ///< number of alliance players in this realm. @todo implement
-                Optional<int32> ExpansionTrialExpiration; ///< expansion trial expiration unix timestamp
+                Optional<Timestamp<>> ExpansionTrialExpiration; ///< expansion trial expiration unix timestamp
+                Optional<NewBuild> NewBuildKeys;
             };
 
             AuthResponse() : ServerPacket(SMSG_AUTH_RESPONSE, 132) { }
@@ -203,13 +214,15 @@ namespace WorldPackets
             WorldAttempt5   = 89
         };
 
-        class ConnectTo final : public ServerPacket
+        class TC_GAME_API ConnectTo final : public ServerPacket
         {
         public:
             static bool InitializeEncryption();
+            static void ShutdownEncryption();
 
             enum AddressType : uint8
             {
+                None = 0,
                 IPv4 = 1,
                 IPv6 = 2,
                 NamedSocket = 3 // not supported by windows client
@@ -217,20 +230,20 @@ namespace WorldPackets
 
             struct SocketAddress
             {
-                AddressType Type;
+                AddressType Type = None;
                 union
                 {
                     std::array<uint8, 4> V4;
                     std::array<uint8, 16> V6;
                     std::array<char, 128> Name;
-                } Address;
+                } Address = { };
             };
 
             struct ConnectPayload
             {
                 SocketAddress Where;
-                uint16 Port;
-                std::array<uint8, 256> Signature;
+                uint16 Port = 0;
+                std::array<uint8, 256> Signature = { };
             };
 
             ConnectTo();
@@ -256,7 +269,7 @@ namespace WorldPackets
 
             uint64 DosResponse = 0;
             uint64 Key = 0;
-            std::array<uint8, 16> LocalChallenge;
+            std::array<uint8, 32> LocalChallenge;
             std::array<uint8, DigestLength> Digest;
 
         private:
@@ -283,17 +296,20 @@ namespace WorldPackets
             void Read() override;
         };
 
-        class EnterEncryptedMode final : public ServerPacket
+        class TC_GAME_API EnterEncryptedMode final : public ServerPacket
         {
         public:
-            EnterEncryptedMode(uint8 const* encryptionKey, bool enabled) : ServerPacket(SMSG_ENTER_ENCRYPTED_MODE, 256 + 1),
+            static bool InitializeEncryption();
+            static void ShutdownEncryption();
+
+            EnterEncryptedMode(std::array<uint8, 32> const& encryptionKey, bool enabled) : ServerPacket(SMSG_ENTER_ENCRYPTED_MODE, 256 + 1),
                 EncryptionKey(encryptionKey), Enabled(enabled)
             {
             }
 
             WorldPacket const* Write() override;
 
-            uint8 const* EncryptionKey;
+            std::array<uint8, 32> const& EncryptionKey;
             bool Enabled = false;
         };
     }

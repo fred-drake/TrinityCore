@@ -19,12 +19,12 @@
 #define _TCSOAP_H
 
 #include "Define.h"
-#include <mutex>
 #include <future>
 #include <string>
+#include <thread>
 
 void process_message(struct soap* soap_message);
-void TCSoapThread(const std::string& host, uint16 port);
+std::thread* CreateSoapThread(const std::string& host, uint16 port);
 
 class SOAPCommand
 {
@@ -38,7 +38,7 @@ class SOAPCommand
         {
         }
 
-        void appendToPrintBuffer(char const* msg)
+        void appendToPrintBuffer(std::string_view msg)
         {
             m_printBuffer += msg;
         }
@@ -54,7 +54,7 @@ class SOAPCommand
             return m_success;
         }
 
-        static void print(void* callbackArg, char const* msg)
+        static void print(void* callbackArg, std::string_view msg)
         {
             ((SOAPCommand*)callbackArg)->appendToPrintBuffer(msg);
         }
