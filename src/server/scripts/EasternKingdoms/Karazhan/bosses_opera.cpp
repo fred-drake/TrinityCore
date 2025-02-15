@@ -229,8 +229,6 @@ public:
                     SummonTito();
                 else SummonTitoTimer -= diff;
             }
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -291,8 +289,6 @@ public:
                 DoCastVictim(SPELL_YIPPING);
                 YipTimer = 10000;
             } else YipTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -423,8 +419,6 @@ public:
                     DoCast(target, SPELL_BRAIN_WIPE);
                 BrainWipeTimer = 20000;
             } else BrainWipeTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -538,8 +532,6 @@ public:
                     RustTimer = 6000;
                 } else RustTimer -= diff;
             }
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -652,8 +644,6 @@ public:
                 DoCastVictim(SPELL_FRIGHTENED_SCREAM);
                 ScreamTimer = urand(20000, 30000);
             } else ScreamTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -737,8 +727,6 @@ public:
                 DoCastVictim(SPELL_CHAIN_LIGHTNING);
                 ChainLightningTimer = 15000;
             } else ChainLightningTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -821,7 +809,7 @@ class npc_grandmother : public CreatureScript
         {
             npc_grandmotherAI(Creature* creature) : ScriptedAI(creature) { }
 
-            bool GossipSelect(Player* player, uint32 menuId, uint32 gossipListId) override
+            bool OnGossipSelect(Player* player, uint32 menuId, uint32 gossipListId) override
             {
                 if (menuId == OPTION_WHAT_PHAT_LEWTS_YOU_HAVE && gossipListId == 0)
                 {
@@ -914,8 +902,6 @@ public:
             if (!UpdateVictim())
                 return;
 
-            DoMeleeAttackIfReady();
-
             if (ChaseTimer <= diff)
             {
                 if (!IsChasing)
@@ -1007,7 +993,6 @@ enum JulianneRomulo
     ROMULO_Y                        = -1758,
 };
 
-
 enum RAJPhase
 {
     PHASE_JULIANNE      = 0,
@@ -1020,7 +1005,7 @@ void PretendToDie(Creature* creature)
     creature->InterruptNonMeleeSpells(true);
     creature->RemoveAllAuras();
     creature->SetHealth(0);
-    creature->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+    creature->SetUninteractible(true);
     creature->GetMotionMaster()->Clear();
     creature->GetMotionMaster()->MoveIdle();
     creature->SetStandState(UNIT_STAND_STATE_DEAD);
@@ -1028,7 +1013,7 @@ void PretendToDie(Creature* creature)
 
 void Resurrect(Creature* target)
 {
-    target->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+    target->SetUninteractible(false);
     target->SetFullHealth();
     target->SetStandState(UNIT_STAND_STATE_STAND);
     target->CastSpell(target, SPELL_RES_VISUAL, true);
@@ -1145,7 +1130,7 @@ public:
             }
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override;
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override;
 
         void JustDied(Unit* /*killer*/) override
         {
@@ -1223,7 +1208,7 @@ public:
             me->DespawnOrUnsummon();
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             if (damage < me->GetHealth())
                 return;
@@ -1253,11 +1238,11 @@ public:
                 {
                     if (Creature* Julianne = (ObjectAccessor::GetCreature((*me), JulianneGUID)))
                     {
-                        Julianne->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                        Julianne->SetUninteractible(false);
                         Julianne->GetMotionMaster()->Clear();
                         Julianne->setDeathState(JUST_DIED);
                         Julianne->CombatStop(true);
-                        Julianne->SetDynamicFlags(UNIT_DYNFLAG_LOOTABLE);
+                        Julianne->ReplaceAllDynamicFlags(UNIT_DYNFLAG_LOOTABLE);
                     }
                     return;
                 }
@@ -1359,8 +1344,6 @@ public:
                 DoCastVictim(SPELL_POISON_THRUST);
                 PoisonThrustTimer = urand(10000, 20000);
             } else PoisonThrustTimer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -1481,11 +1464,9 @@ void boss_julianne::boss_julianneAI::UpdateAI(uint32 diff)
 
         EternalAffectionTimer = urand(45000, 60000);
     } else EternalAffectionTimer -= diff;
-
-    DoMeleeAttackIfReady();
 }
 
-void boss_julianne::boss_julianneAI::DamageTaken(Unit* /*done_by*/, uint32 &damage)
+void boss_julianne::boss_julianneAI::DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/)
 {
     if (damage < me->GetHealth())
         return;
@@ -1522,11 +1503,11 @@ void boss_julianne::boss_julianneAI::DamageTaken(Unit* /*done_by*/, uint32 &dama
         {
             if (Creature* Romulo = (ObjectAccessor::GetCreature((*me), RomuloGUID)))
             {
-                Romulo->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                Romulo->SetUninteractible(false);
                 Romulo->GetMotionMaster()->Clear();
                 Romulo->setDeathState(JUST_DIED);
                 Romulo->CombatStop(true);
-                Romulo->SetDynamicFlags(UNIT_DYNFLAG_LOOTABLE);
+                Romulo->ReplaceAllDynamicFlags(UNIT_DYNFLAG_LOOTABLE);
             }
 
             return;

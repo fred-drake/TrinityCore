@@ -15,11 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include "ScriptMgr.h"
 #include "black_temple.h"
-#include "Containers.h"
-#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
@@ -137,7 +134,7 @@ struct boss_mother_shahraz : public BossAI
         _DespawnAtEvade();
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32 &damage) override
+    void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (!_enraged && me->HealthBelowPctDamaged(10, damage))
         {
@@ -189,8 +186,6 @@ private:
 // 40869 - Fatal Attraction
 class spell_mother_shahraz_fatal_attraction : public SpellScript
 {
-    PrepareSpellScript(spell_mother_shahraz_fatal_attraction);
-
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo(
@@ -226,8 +221,6 @@ class spell_mother_shahraz_fatal_attraction : public SpellScript
 // 40870 - Fatal Attraction Dummy Visual
 class spell_mother_shahraz_fatal_attraction_link : public SpellScript
 {
-    PrepareSpellScript(spell_mother_shahraz_fatal_attraction_link);
-
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo({ SPELL_FATAL_ATTRACTION_DAMAGE });
@@ -247,11 +240,9 @@ class spell_mother_shahraz_fatal_attraction_link : public SpellScript
 // 40816 - Saber Lash
 class spell_mother_shahraz_saber_lash : public AuraScript
 {
-    PrepareAuraScript(spell_mother_shahraz_saber_lash);
-
     bool Validate(SpellInfo const* spellInfo) override
     {
-        return spellInfo->GetEffects().size() > EFFECT_1
+        return ValidateSpellEffect({ { spellInfo->Id, EFFECT_1 } })
             && ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_1).TriggerSpell });
     }
 
@@ -276,11 +267,9 @@ class spell_mother_shahraz_saber_lash : public AuraScript
    40862 - Sinful Periodic */
 class spell_mother_shahraz_generic_periodic : public AuraScript
 {
-    PrepareAuraScript(spell_mother_shahraz_generic_periodic);
-
     bool Validate(SpellInfo const* spellInfo) override
     {
-        return !spellInfo->GetEffects().empty()
+        return ValidateSpellEffect({ { spellInfo->Id, EFFECT_0 } })
             && ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0).TriggerSpell });
     }
 
@@ -302,8 +291,6 @@ class spell_mother_shahraz_generic_periodic : public AuraScript
 // 40867 - Random Periodic
 class spell_mother_shahraz_random_periodic : public AuraScript
 {
-    PrepareAuraScript(spell_mother_shahraz_random_periodic);
-
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo(RandomBeam);
@@ -326,7 +313,7 @@ void AddSC_boss_mother_shahraz()
     RegisterBlackTempleCreatureAI(boss_mother_shahraz);
     RegisterSpellScript(spell_mother_shahraz_fatal_attraction);
     RegisterSpellScript(spell_mother_shahraz_fatal_attraction_link);
-    RegisterAuraScript(spell_mother_shahraz_saber_lash);
-    RegisterAuraScript(spell_mother_shahraz_generic_periodic);
-    RegisterAuraScript(spell_mother_shahraz_random_periodic);
+    RegisterSpellScript(spell_mother_shahraz_saber_lash);
+    RegisterSpellScript(spell_mother_shahraz_generic_periodic);
+    RegisterSpellScript(spell_mother_shahraz_random_periodic);
 }

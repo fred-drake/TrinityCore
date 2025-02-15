@@ -20,7 +20,7 @@
 
 #include "DatabaseEnvFwd.h"
 #include "Define.h"
-#include "MySQLWorkaround.h"
+#include "Duration.h"
 #include <string>
 #include <vector>
 
@@ -48,6 +48,7 @@ class TC_DATABASE_API MySQLPreparedStatement
         void SetParameter(uint8 index, bool value);
         template<typename T>
         void SetParameter(uint8 index, T value);
+        void SetParameter(uint8 index, SystemTimePoint value);
         void SetParameter(uint8 index, std::string const& value);
         void SetParameter(uint8 index, std::vector<uint8> const& value);
 

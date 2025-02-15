@@ -150,7 +150,7 @@ public:
                     if (entry_list[cid] == ENTRY_NIHIL)
                     {
                         EnterEvadeMode();
-                        me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                        me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         IsNihil = true;
                     }
                     else
@@ -184,7 +184,7 @@ public:
                             ++NihilSpeech_Phase;
                             break;
                         case 4:
-                            me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                            me->SetUninteractible(true);
                             //take off to location above
                             me->GetMotionMaster()->MovePoint(0, me->GetPositionX()+50.0f, me->GetPositionY(), me->GetPositionZ()+50.0f);
                             ++NihilSpeech_Phase;
@@ -219,8 +219,6 @@ public:
                 DoCastVictim(SPELL_ARCANE_BLAST);
                 ArcaneBlast_Timer = 2500 + rand32() % 5000;
             } else ArcaneBlast_Timer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -257,7 +255,7 @@ public:
     {
         go_legion_obeliskAI(GameObject* go) : GameObjectAI(go) { }
 
-        bool GossipHello(Player* player) override
+        bool OnGossipHello(Player* player) override
         {
             if (player->GetQuestStatus(QUEST_YOURE_FIRED) == QUEST_STATUS_INCOMPLETE)
             {
@@ -593,7 +591,7 @@ class npc_simon_bunny : public CreatureScript
                 _events.ScheduleEvent(EVENT_SIMON_PERIODIC_PLAYER_CHECK, 2s);
 
                 if (GameObject* relic = me->FindNearestGameObject(large ? GO_APEXIS_MONUMENT : GO_APEXIS_RELIC, searchDistance))
-                    relic->AddFlag(GO_FLAG_NOT_SELECTABLE);
+                    relic->SetFlag(GO_FLAG_NOT_SELECTABLE);
             }
 
             // Called when despawning the bunny. Sets all the node GOs to their default states.
@@ -603,7 +601,7 @@ class npc_simon_bunny : public CreatureScript
 
                 for (uint32 clusterId = SIMON_BLUE; clusterId < SIMON_MAX_COLORS; clusterId++)
                     if (GameObject* cluster = me->FindNearestGameObject(clusterIds[clusterId], searchDistance))
-                        cluster->AddFlag(GO_FLAG_NOT_SELECTABLE);
+                        cluster->SetFlag(GO_FLAG_NOT_SELECTABLE);
 
                 for (uint32 auraId = GO_AURA_BLUE; auraId <= GO_AURA_YELLOW; auraId++)
                     if (GameObject* auraGo = me->FindNearestGameObject(auraId, searchDistance))
@@ -647,7 +645,6 @@ class npc_simon_bunny : public CreatureScript
                 for (std::list<uint8>::const_iterator i = colorSequence.begin(); i != colorSequence.end(); ++i)
                     playableSequence.push_back(*i);
             }
-
 
             // Remove any existant glowing auras over clusters and set clusters ready for interating with them.
             void PrepareClusters(bool clustersOnly = false)
@@ -708,7 +705,7 @@ class npc_simon_bunny : public CreatureScript
                 {
                     if (GameObject* cluster = me->FindNearestGameObject(clusterIds[clusterId], 2.0f*searchDistance))
                     {
-                        cluster->AddFlag(GO_FLAG_NOT_SELECTABLE);
+                        cluster->SetFlag(GO_FLAG_NOT_SELECTABLE);
 
                         // break since we don't need glowing auras for large clusters
                         if (large)
@@ -848,7 +845,7 @@ class go_simon_cluster : public GameObjectScript
         {
             go_simon_clusterAI(GameObject* go) : GameObjectAI(go) { }
 
-            bool GossipHello(Player* player) override
+            bool OnGossipHello(Player* player) override
             {
                 if (Creature* bunny = me->FindNearestCreature(NPC_SIMON_BUNNY, 12.0f, true))
                     bunny->AI()->SetData(me->GetEntry(), 0);
@@ -884,14 +881,14 @@ class go_apexis_relic : public GameObjectScript
         {
             go_apexis_relicAI(GameObject* go) : GameObjectAI(go) { }
 
-            bool GossipHello(Player* player) override
+            bool OnGossipHello(Player* player) override
             {
                 player->PrepareGossipMenu(me, me->GetGOInfo()->questgiver.gossipID);
                 player->SendPreparedGossip(me);
                 return true;
             }
 
-            bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 /*gossipListId*/) override
+            bool OnGossipSelect(Player* player, uint32 /*menuId*/, uint32 /*gossipListId*/) override
             {
                 CloseGossipMenuFor(player);
 
@@ -955,7 +952,7 @@ public:
 
         void IsSummonedBy(WorldObject* summoner) override
         {
-            if (summoner->isType(TYPEMASK_PLAYER))
+            if (summoner->IsPlayer())
                 playerGuid = summoner->GetGUID();
         }
 
@@ -983,6 +980,7 @@ public:
     }
 };
 
+// 37408 - Oscillation Field
 class spell_oscillating_field : public SpellScriptLoader
 {
     public:
@@ -990,8 +988,6 @@ class spell_oscillating_field : public SpellScriptLoader
 
         class spell_oscillating_field_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_oscillating_field_SpellScript);
-
             void HandleEffect(SpellEffIndex /*effIndex*/)
             {
                 if (Player* player = GetHitPlayer())

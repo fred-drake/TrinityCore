@@ -25,7 +25,6 @@ EndScriptData */
 #include "ScriptMgr.h"
 #include "karazhan.h"
 #include "InstanceScript.h"
-#include "GameObject.h"
 #include "Item.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
@@ -174,6 +173,7 @@ public:
         void Reset() override
         {
             Initialize();
+            me->SetCanMelee(true);
 
             // Not in progress
             instance->SetBossState(DATA_ARAN, NOT_STARTED);
@@ -489,11 +489,10 @@ public:
                 } else FlameWreathCheckTime -= diff;
             }
 
-            if (ArcaneCooldown && FireCooldown && FrostCooldown)
-                DoMeleeAttackIfReady();
+            me->SetCanMelee(ArcaneCooldown && FireCooldown && FrostCooldown);
         }
 
-        void DamageTaken(Unit* /*pAttacker*/, uint32 &damage) override
+        void DamageTaken(Unit* /*pAttacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             if (!DrinkInturrupted && Drinking && damage)
                 DrinkInturrupted = true;

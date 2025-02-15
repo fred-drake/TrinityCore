@@ -23,8 +23,10 @@
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+#include "StringConvert.h"
 #include "World.h"
 #include <boost/algorithm/string/find.hpp>
+#include <fstream>
 #include <sstream>
 
 // static data
@@ -229,16 +231,16 @@ inline void MarkDependentColumn(TableStruct& tableStruct, std::string const& col
     auto itr = FindColumnByName(tableStruct, columnName);
     if (itr == tableStruct.TableFields.end())
     {
-        TC_LOG_FATAL("server.loading", "Column `%s` declared in table `%s` marked as dependent but doesn't exist, PlayerDump will not work properly, please update table definitions",
-            columnName.c_str(), tableStruct.TableName.c_str());
+        TC_LOG_FATAL("server.loading", "Column `{}` declared in table `{}` marked as dependent but doesn't exist, PlayerDump will not work properly, please update table definitions",
+            columnName, tableStruct.TableName);
         ABORT();
         return;
     }
 
     if (itr->IsDependentField)
     {
-        TC_LOG_FATAL("server.loading", "Attempt to mark column `%s` in table `%s` as dependent column but already marked! please check your code.",
-            columnName.c_str(), tableStruct.TableName.c_str());
+        TC_LOG_FATAL("server.loading", "Attempt to mark column `{}` in table `{}` as dependent column but already marked! please check your code.",
+            columnName, tableStruct.TableName);
         ABORT();
         return;
     }
@@ -254,8 +256,8 @@ inline void MarkWhereField(TableStruct& tableStruct, std::string const& whereFie
     auto whereFieldItr = FindColumnByName(tableStruct, whereField);
     if (whereFieldItr == tableStruct.TableFields.end())
     {
-        TC_LOG_FATAL("server.loading", "Column name `%s` set as 'WHERE' column for table `%s` doesn't exist. PlayerDump won't work properly",
-            whereField.c_str(), tableStruct.TableName.c_str());
+        TC_LOG_FATAL("server.loading", "Column name `{}` set as 'WHERE' column for table `{}` doesn't exist. PlayerDump won't work properly",
+            whereField, tableStruct.TableName);
         ABORT();
         return;
     }
@@ -288,7 +290,7 @@ void PlayerDump::InitializeTables()
         TableStruct t;
         t.TableName = dumpTable.Name;
 
-        QueryResult result = CharacterDatabase.PQuery("DESC %s", dumpTable.Name);
+        QueryResult result = CharacterDatabase.PQuery("DESC {}", dumpTable.Name);
         // prepared statement is correct (checked at startup) so table must exist
         ASSERT(result);
 
@@ -340,7 +342,7 @@ void PlayerDump::InitializeTables()
                 // item0 - item18
                 for (uint32 j = 0; j < EQUIPMENT_SLOT_END; ++j)
                 {
-                    std::string itColumn = Trinity::StringFormat("item%u", j);
+                    std::string itColumn = Trinity::StringFormat("item{}", j);
                     MarkDependentColumn(t, itColumn, GUID_TYPE_ITEM);
                 }
                 break;
@@ -399,7 +401,7 @@ void PlayerDump::InitializeTables()
                 MarkDependentColumn(t, "guid", GUID_TYPE_PET);
                 break;
             default:
-                TC_LOG_FATAL("server.loading", "Wrong dump table type %u, probably added a new table type without updating code", uint32(dumpTable.Type));
+                TC_LOG_FATAL("server.loading", "Wrong dump table type {}, probably added a new table type without updating code", uint32(dumpTable.Type));
                 ABORT();
                 return;
         }
@@ -412,7 +414,7 @@ void PlayerDump::InitializeTables()
     {
         if (tableStruct.WhereFieldName.empty())
         {
-            TC_LOG_FATAL("server.loading", "Table `%s` defined in player dump doesn't have a WHERE query field", tableStruct.TableName.c_str());
+            TC_LOG_FATAL("server.loading", "Table `{}` defined in player dump doesn't have a WHERE query field", tableStruct.TableName);
             ABORT();
         }
     }
@@ -422,7 +424,7 @@ void PlayerDump::InitializeTables()
 
     ASSERT(CharacterTables.size() == DUMP_TABLE_COUNT);
 
-    TC_LOG_INFO("server.loading", ">> Initialized tables for PlayerDump in %u ms.", GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Initialized tables for PlayerDump in {} ms.", GetMSTimeDiffToNow(oldMSTime));
 }
 
 // Low level functions
@@ -523,7 +525,7 @@ inline bool ValidateFields(TableStruct const& ts, std::string const& str, size_t
     s = str.find("` (`");
     if (s == std::string::npos)
     {
-        TC_LOG_ERROR("misc", "LoadPlayerDump: (line " SZFMTD ") dump format not recognized.", lineNumber);
+        TC_LOG_ERROR("misc", "LoadPlayerDump: (line {}) dump format not recognized.", lineNumber);
         return false;
     }
     s += 4;
@@ -532,7 +534,7 @@ inline bool ValidateFields(TableStruct const& ts, std::string const& str, size_t
     std::string::size_type e = str.find('`', s);
     if (e == std::string::npos || valPos == std::string::npos)
     {
-        TC_LOG_ERROR("misc", "LoadPlayerDump: (line " SZFMTD ") unexpected end of line", lineNumber);
+        TC_LOG_ERROR("misc", "LoadPlayerDump: (line {}) unexpected end of line", lineNumber);
         return false;
     }
 
@@ -542,7 +544,7 @@ inline bool ValidateFields(TableStruct const& ts, std::string const& str, size_t
         int32 columnIndex = GetColumnIndexByName(ts, column);
         if (columnIndex == -1)
         {
-            TC_LOG_ERROR("misc", "LoadPlayerDump: (line " SZFMTD ") unknown column name `%s` for table `%s`, aborting due to incompatible DB structure.", lineNumber, column.c_str(), ts.TableName.c_str());
+            TC_LOG_ERROR("misc", "LoadPlayerDump: (line {}) unknown column name `{}` for table `{}`, aborting due to incompatible DB structure.", lineNumber, column, ts.TableName);
             return false;
         }
 
@@ -591,7 +593,7 @@ inline T RegisterNewGuid(T oldGuid, MapType<T, T, Rest...>& guidMap, T guidOffse
 template <typename T, template<class, class, class...> class MapType, class... Rest>
 inline bool ChangeGuid(TableStruct const& ts, std::string& str, std::string const& column, MapType<T, T, Rest...>& guidMap, T guidOffset, bool allowZero = false)
 {
-    T oldGuid(atoull(GetColumn(ts, str, column).c_str()));
+    T oldGuid = Trinity::StringTo<T>(GetColumn(ts, str, column)).template value_or<T>(0);
     if (allowZero && !oldGuid)
         return true;                                        // not an error
 
@@ -638,8 +640,12 @@ inline void AppendTableDump(StringTransaction& trans, TableStruct const& tableSt
                 }
                 else
                 {
-                    std::vector<uint8> b(fields[i].GetBinary());
-                    ss << "0x" << ByteArrayToHexStr(b);
+                    std::span<uint8 const> b = fields[i].GetBinaryView();
+
+                    if (!b.empty())
+                        ss << "0x" << ByteArrayToHexStr(b);
+                    else
+                        ss << '\'' << '\'';
                 }
             }
 
@@ -697,7 +703,7 @@ void PlayerDumpWriter::PopulateGuids(ObjectGuid::LowType guid)
         }
 
         std::string whereStr = GenerateWhereStr(baseTable.PlayerGuid, guid);
-        QueryResult result = CharacterDatabase.PQuery("SELECT %s FROM %s WHERE %s", baseTable.PrimaryKey, baseTable.TableName, whereStr.c_str());
+        QueryResult result = CharacterDatabase.PQuery("SELECT {} FROM {} WHERE {}", baseTable.PrimaryKey, baseTable.TableName, whereStr);
         if (!result)
             continue;
 
@@ -766,7 +772,7 @@ bool PlayerDumpWriter::AppendTable(StringTransaction& trans, ObjectGuid::LowType
             break;
     }
 
-    QueryResult result = CharacterDatabase.PQuery("SELECT * FROM %s WHERE %s", dumpTable.Name, whereStr.c_str());
+    QueryResult result = CharacterDatabase.PQuery("SELECT * FROM {} WHERE {}", dumpTable.Name, whereStr);
     switch (dumpTable.Type)
     {
         case DTT_CHARACTER:
@@ -809,7 +815,7 @@ bool PlayerDumpWriter::GetDump(ObjectGuid::LowType guid, std::string& dump)
     return true;
 }
 
-DumpReturn PlayerDumpWriter::WriteDump(std::string const& file, ObjectGuid::LowType guid)
+DumpReturn PlayerDumpWriter::WriteDumpToFile(std::string const& file, ObjectGuid::LowType guid)
 {
     if (sWorld->getBoolConfig(CONFIG_PDUMP_NO_PATHS))
         if (strchr(file.c_str(), '\\') || strchr(file.c_str(), '/'))
@@ -835,6 +841,14 @@ DumpReturn PlayerDumpWriter::WriteDump(std::string const& file, ObjectGuid::LowT
     return ret;
 }
 
+DumpReturn PlayerDumpWriter::WriteDumpToString(std::string& dump, ObjectGuid::LowType guid)
+{
+    DumpReturn ret = DUMP_SUCCESS;
+    if (!GetDump(guid, dump))
+        ret = DUMP_CHARACTER_DELETED;
+    return ret;
+}
+
 // Reading - High-level functions
 inline void FixNULLfields(std::string& line)
 {
@@ -847,15 +861,11 @@ inline void FixNULLfields(std::string& line)
     }
 }
 
-DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, std::string name, ObjectGuid::LowType guid)
+DumpReturn PlayerDumpReader::LoadDump(std::istream& input, uint32 account, std::string name, ObjectGuid::LowType guid)
 {
     uint32 charcount = AccountMgr::GetCharactersCount(account);
     if (charcount >= sWorld->getIntConfig(CONFIG_CHARACTERS_PER_REALM))
         return DUMP_TOO_MANY_CHARS;
-
-    FileHandle fin = GetFileHandle(file.c_str(), "r");
-    if (!fin)
-        return DUMP_FILE_OPEN_ERROR;
 
     std::string newguid, chraccount;
 
@@ -896,8 +906,8 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
     std::map<ObjectGuid::LowType, ObjectGuid::LowType> items;
     ObjectGuid::LowType itemLowGuidOffset = sObjectMgr->GetGenerator<HighGuid::Item>().GetNextAfterMaxUsed();
 
-    std::map<uint32, uint32> mails;
-    uint32 mailLowGuidOffset = sObjectMgr->_mailId;
+    std::map<uint64, uint64> mails;
+    uint64 mailLowGuidOffset = sObjectMgr->_mailId;
 
     std::map<uint32, uint32> petIds;
     uint32 petLowGuidOffset = sObjectMgr->_hiPetNumber;
@@ -905,8 +915,7 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
     std::map<uint64, uint64> equipmentSetIds;
     uint64 equipmentSetGuidOffset = sObjectMgr->_equipmentSetGuid;
 
-    static size_t const BUFFER_SIZE = 32000;
-    char buf[BUFFER_SIZE] = { };
+    std::string line;
 
     uint8 gender = GENDER_NONE;
     uint8 race = RACE_NONE;
@@ -917,17 +926,8 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
     size_t lineNumber = 0;
 
     CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-    while (!feof(fin.get()))
+    while (std::getline(input, line))
     {
-        if (!fgets(buf, BUFFER_SIZE, fin.get()))
-        {
-            if (feof(fin.get()))
-                break;
-            return DUMP_FILE_BROKEN;
-        }
-
-        std::string line;
-        line.assign(buf);
         ++lineNumber;
 
         // skip empty strings
@@ -944,7 +944,7 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
         std::string tn = GetTableName(line);
         if (tn.empty())
         {
-            TC_LOG_ERROR("misc", "LoadPlayerDump: (line " SZFMTD ") Can't extract table name!", lineNumber);
+            TC_LOG_ERROR("misc", "LoadPlayerDump: (line {}) Can't extract table name!", lineNumber);
             return DUMP_FILE_BROKEN;
         }
 
@@ -961,7 +961,7 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
 
         if (i == DUMP_TABLE_COUNT)
         {
-            TC_LOG_ERROR("misc", "LoadPlayerDump: (line " SZFMTD ") Unknown table: `%s`!", lineNumber, tn.c_str());
+            TC_LOG_ERROR("misc", "LoadPlayerDump: (line {}) Unknown table: `{}`!", lineNumber, tn);
             return DUMP_FILE_BROKEN;
         }
 
@@ -1016,14 +1016,14 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
         {
             case DTT_CHARACTER:
             {
-                race = uint8(atoul(GetColumn(ts, line, "race").c_str()));
-                playerClass = uint8(atoul(GetColumn(ts, line, "class").c_str()));
-                gender = uint8(atoul(GetColumn(ts, line, "gender").c_str()));
-                level = uint8(atoul(GetColumn(ts, line, "level").c_str()));
+                race = Trinity::StringTo<uint8>(GetColumn(ts, line, "race")).value_or<uint8>(0);
+                playerClass = Trinity::StringTo<uint8>(GetColumn(ts, line, "class")).value_or<uint8>(0);
+                gender = Trinity::StringTo<uint8>(GetColumn(ts, line, "gender")).value_or<uint8>(0);
+                level = Trinity::StringTo<uint8>(GetColumn(ts, line, "level")).value_or<uint8>(0);
                 if (name.empty())
                 {
                     // generate a temporary name
-                    std::string guidPart = Trinity::StringFormat("%X", guid);
+                    std::string guidPart = Trinity::StringFormat("{:X}", guid);
                     std::size_t maxCharsFromOriginalName = MAX_PLAYER_NAME - guidPart.length();
 
                     name = GetColumn(ts, line, "name").substr(0, maxCharsFromOriginalName) + guidPart;
@@ -1047,6 +1047,9 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
         trans->Append(line.c_str());
     }
 
+    if (input.fail() && !input.eof())
+        return DUMP_FILE_BROKEN;
+
     CharacterDatabase.CommitTransaction(trans);
 
     // in case of name conflict player has to rename at login anyway
@@ -1060,5 +1063,21 @@ DumpReturn PlayerDumpReader::LoadDump(std::string const& file, uint32 account, s
     if (incHighest)
         sObjectMgr->GetGenerator<HighGuid::Player>().Generate();
 
+    sWorld->UpdateRealmCharCount(account);
+
     return DUMP_SUCCESS;
+}
+
+DumpReturn PlayerDumpReader::LoadDumpFromString(std::string const& dump, uint32 account, std::string name, ObjectGuid::LowType guid)
+{
+    std::istringstream input(dump);
+    return LoadDump(input, account, name, guid);
+}
+
+DumpReturn PlayerDumpReader::LoadDumpFromFile(std::string const& file, uint32 account, std::string name, ObjectGuid::LowType guid)
+{
+    std::ifstream input(file);
+    if (!input)
+        return DUMP_FILE_OPEN_ERROR;
+    return LoadDump(input, account, name, guid);
 }

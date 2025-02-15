@@ -18,17 +18,55 @@
 #include "QueryPackets.h"
 #include "BattlenetAccountMgr.h"
 #include "CharacterCache.h"
+#include "ClubUtils.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "World.h"
 #include "WorldSession.h"
 
-void WorldPackets::Query::QueryCreature::Read()
+ByteBuffer& operator<<(ByteBuffer& data, QuestPOIData const& questPOIData)
+{
+    data << int32(questPOIData.QuestID);
+    data << int32(questPOIData.Blobs.size());
+
+    for (QuestPOIBlobData const& questPOIBlobData : questPOIData.Blobs)
+    {
+        data << int32(questPOIBlobData.BlobIndex);
+        data << int32(questPOIBlobData.ObjectiveIndex);
+        data << int32(questPOIBlobData.QuestObjectiveID);
+        data << int32(questPOIBlobData.QuestObjectID);
+        data << int32(questPOIBlobData.MapID);
+        data << int32(questPOIBlobData.UiMapID);
+        data << int32(questPOIBlobData.Priority);
+        data << int32(questPOIBlobData.Flags);
+        data << int32(questPOIBlobData.WorldEffectID);
+        data << int32(questPOIBlobData.PlayerConditionID);
+        data << int32(questPOIBlobData.NavigationPlayerConditionID);
+        data << int32(questPOIBlobData.SpawnTrackingID);
+        data << int32(questPOIBlobData.Points.size());
+
+        for (QuestPOIBlobPoint const& questPOIBlobPoint : questPOIBlobData.Points)
+        {
+            data << int16(questPOIBlobPoint.X);
+            data << int16(questPOIBlobPoint.Y);
+            data << int16(questPOIBlobPoint.Z);
+        }
+
+        data.WriteBit(questPOIBlobData.AlwaysAllowMergingBlobs);
+        data.FlushBits();
+    }
+
+    return data;
+}
+
+namespace WorldPackets::Query
+{
+void QueryCreature::Read()
 {
     _worldPacket >> CreatureID;
 }
 
-WorldPacket const* WorldPackets::Query::QueryCreatureResponse::Write()
+WorldPacket const* QueryCreatureResponse::Write()
 {
     _worldPacket << uint32(CreatureID);
     _worldPacket.WriteBit(Allow);
@@ -75,6 +113,7 @@ WorldPacket const* WorldPackets::Query::QueryCreatureResponse::Write()
         _worldPacket << float(Stats.HpMulti);
         _worldPacket << float(Stats.EnergyMulti);
         _worldPacket << uint32(Stats.QuestItems.size());
+        _worldPacket << uint32(Stats.QuestCurrencies.size());
         _worldPacket << int32(Stats.CreatureMovementInfoID);
         _worldPacket << int32(Stats.HealthScalingExpansion);
         _worldPacket << int32(Stats.RequiredExpansion);
@@ -95,32 +134,22 @@ WorldPacket const* WorldPackets::Query::QueryCreatureResponse::Write()
 
         if (!Stats.QuestItems.empty())
             _worldPacket.append(Stats.QuestItems.data(), Stats.QuestItems.size());
+
+        if (!Stats.QuestCurrencies.empty())
+            _worldPacket.append(Stats.QuestCurrencies.data(), Stats.QuestCurrencies.size());
     }
 
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryPlayerName::Read()
+void QueryPlayerNames::Read()
 {
-    _worldPacket >> Player;
+    Players.resize(_worldPacket.read<uint32>());
+    for (ObjectGuid& player : Players)
+        _worldPacket >> player;
 }
 
-ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::PlayerGuidLookupHint const& lookupHint)
-{
-    data.WriteBit(lookupHint.VirtualRealmAddress.has_value());
-    data.WriteBit(lookupHint.NativeRealmAddress.has_value());
-    data.FlushBits();
-
-    if (lookupHint.VirtualRealmAddress)
-        data << uint32(*lookupHint.VirtualRealmAddress);
-
-    if (lookupHint.NativeRealmAddress)
-        data << uint32(*lookupHint.NativeRealmAddress);
-
-    return data;
-}
-
-bool WorldPackets::Query::PlayerGuidLookupData::Initialize(ObjectGuid const& guid, Player const* player /*= nullptr*/)
+bool PlayerGuidLookupData::Initialize(ObjectGuid const& guid, Player const* player /*= nullptr*/)
 {
     CharacterCacheEntry const* characterInfo = sCharacterCache->GetCharacterCacheByGuid(guid);
     if (!characterInfo)
@@ -137,8 +166,10 @@ bool WorldPackets::Query::PlayerGuidLookupData::Initialize(ObjectGuid const& gui
         Sex           = player->GetNativeGender();
         ClassID       = player->GetClass();
         Level         = player->GetLevel();
+        PvpFaction    = player->GetTeamId() == TEAM_ALLIANCE ? 1 : 0;
+        TimerunningSeasonID = player->m_activePlayerData->TimerunningSeasonID;
 
-        if (DeclinedName const* names = player->GetDeclinedNames())
+        if (UF::DeclinedNames const* names = player->GetDeclinedNames())
             DeclinedNames = *names;
     }
     else
@@ -153,16 +184,18 @@ bool WorldPackets::Query::PlayerGuidLookupData::Initialize(ObjectGuid const& gui
         Sex           = characterInfo->Sex;
         ClassID       = characterInfo->Class;
         Level         = characterInfo->Level;
+        PvpFaction    = Player::TeamIdForRace(characterInfo->Race) == TEAM_ALLIANCE ? 1 : 0;
     }
 
     IsDeleted = characterInfo->IsDeleted;
     GuidActual = guid;
+    GuildClubMemberID = ::Battlenet::Services::Clubs::CreateClubMemberId(guid);
     VirtualRealmAddress = GetVirtualRealmAddress();
 
     return true;
 }
 
-ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::PlayerGuidLookupData const& lookupData)
+ByteBuffer& operator<<(ByteBuffer& data, PlayerGuidLookupData const& lookupData)
 {
     data.WriteBit(lookupData.IsDeleted);
     data.WriteBits(lookupData.Name.length(), 6);
@@ -182,30 +215,58 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::PlayerGuidLookupDa
     data << uint8(lookupData.Sex);
     data << uint8(lookupData.ClassID);
     data << uint8(lookupData.Level);
-    data << uint8(lookupData.Unused915);
+    data << uint8(lookupData.PvpFaction);
+    data << int32(lookupData.TimerunningSeasonID);
     data.WriteString(lookupData.Name);
 
     return data;
 }
 
-WorldPacket const* WorldPackets::Query::QueryPlayerNameResponse::Write()
+ByteBuffer& operator<<(ByteBuffer& data, GuildGuidLookupData const& lookupData)
 {
-    _worldPacket << uint8(Result);
-    _worldPacket << Player;
+    data << uint32(lookupData.VirtualRealmAddress);
+    data << lookupData.Guid;
+    data.WriteBits(lookupData.Name.length(), 7);
+    data.FlushBits();
 
-    if (Result == RESPONSE_SUCCESS)
-        _worldPacket << Data;
+    data.WriteString(lookupData.Name);
+
+    return data;
+}
+
+ByteBuffer& operator<<(ByteBuffer& data, NameCacheLookupResult const& result)
+{
+    data << uint8(result.Result);
+    data << result.Player;
+    data.WriteBit(result.Data.has_value());
+    data.WriteBit(result.GuildData.has_value());
+    data.FlushBits();
+
+    if (result.Data)
+        data << *result.Data;
+
+    if (result.GuildData)
+        data << *result.GuildData;
+
+    return data;
+}
+
+WorldPacket const* QueryPlayerNamesResponse::Write()
+{
+    _worldPacket << uint32(Players.size());
+    for (NameCacheLookupResult const& lookupResult : Players)
+        _worldPacket << lookupResult;
 
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryPageText::Read()
+void QueryPageText::Read()
 {
     _worldPacket >> PageTextID;
     _worldPacket >> ItemGUID;
 }
 
-ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::QueryPageTextResponse::PageTextInfo const& page)
+ByteBuffer& operator<<(ByteBuffer& data, QueryPageTextResponse::PageTextInfo const& page)
 {
     data << uint32(page.ID);
     data << uint32(page.NextPageID);
@@ -219,7 +280,7 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::QueryPageTextRespo
     return data;
 }
 
-WorldPacket const* WorldPackets::Query::QueryPageTextResponse::Write()
+WorldPacket const* QueryPageTextResponse::Write()
 {
     _worldPacket << uint32(PageTextID);
     _worldPacket.WriteBit(Allow);
@@ -236,13 +297,13 @@ WorldPacket const* WorldPackets::Query::QueryPageTextResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryNPCText::Read()
+void QueryNPCText::Read()
 {
     _worldPacket >> TextID;
     _worldPacket >> Guid;
 }
 
-WorldPacket const* WorldPackets::Query::QueryNPCTextResponse::Write()
+WorldPacket const* QueryNPCTextResponse::Write()
 {
     _worldPacket << uint32(TextID);
     _worldPacket.WriteBit(Allow);
@@ -260,13 +321,13 @@ WorldPacket const* WorldPackets::Query::QueryNPCTextResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryGameObject::Read()
+void QueryGameObject::Read()
 {
     _worldPacket >> GameObjectID;
     _worldPacket >> Guid;
 }
 
-WorldPacket const* WorldPackets::Query::QueryGameObjectResponse::Write()
+WorldPacket const* QueryGameObjectResponse::Write()
 {
     _worldPacket << GameObjectID;
     _worldPacket << Guid;
@@ -303,32 +364,32 @@ WorldPacket const* WorldPackets::Query::QueryGameObjectResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryCorpseLocationFromClient::Read()
+void QueryCorpseLocationFromClient::Read()
 {
     _worldPacket >> Player;
 }
 
-WorldPacket const* WorldPackets::Query::CorpseLocation::Write()
+WorldPacket const* CorpseLocation::Write()
 {
-    _worldPacket.WriteBit(Valid);
+    _worldPacket << Bits<1>(Valid);
     _worldPacket.FlushBits();
 
     _worldPacket << Player;
     _worldPacket << ActualMapID;
-    _worldPacket << Position;
     _worldPacket << MapID;
     _worldPacket << Transport;
+    _worldPacket << Position;
 
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryCorpseTransport::Read()
+void QueryCorpseTransport::Read()
 {
     _worldPacket >> Player;
     _worldPacket >> Transport;
 }
 
-WorldPacket const* WorldPackets::Query::CorpseTransportQuery::Write()
+WorldPacket const* CorpseTransportQuery::Write()
 {
     _worldPacket << Player;
     _worldPacket << Position;
@@ -337,14 +398,14 @@ WorldPacket const* WorldPackets::Query::CorpseTransportQuery::Write()
     return &_worldPacket;
 }
 
-WorldPacket const* WorldPackets::Query::QueryTimeResponse::Write()
+WorldPacket const* QueryTimeResponse::Write()
 {
     _worldPacket << CurrentTime;
 
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QuestPOIQuery::Read()
+void QuestPOIQuery::Read()
 {
     _worldPacket >> MissingQuestCount;
 
@@ -352,42 +413,7 @@ void WorldPackets::Query::QuestPOIQuery::Read()
         _worldPacket >> MissingQuestPOIs[i];
 }
 
-ByteBuffer& operator<<(ByteBuffer& data, QuestPOIData const& questPOIData)
-{
-    data << int32(questPOIData.QuestID);
-    data << int32(questPOIData.Blobs.size());
-
-    for (QuestPOIBlobData const& questPOIBlobData : questPOIData.Blobs)
-    {
-        data << int32(questPOIBlobData.BlobIndex);
-        data << int32(questPOIBlobData.ObjectiveIndex);
-        data << int32(questPOIBlobData.QuestObjectiveID);
-        data << int32(questPOIBlobData.QuestObjectID);
-        data << int32(questPOIBlobData.MapID);
-        data << int32(questPOIBlobData.UiMapID);
-        data << int32(questPOIBlobData.Priority);
-        data << int32(questPOIBlobData.Flags);
-        data << int32(questPOIBlobData.WorldEffectID);
-        data << int32(questPOIBlobData.PlayerConditionID);
-        data << int32(questPOIBlobData.NavigationPlayerConditionID);
-        data << int32(questPOIBlobData.SpawnTrackingID);
-        data << int32(questPOIBlobData.Points.size());
-
-        for (QuestPOIBlobPoint const& questPOIBlobPoint : questPOIBlobData.Points)
-        {
-            data << int16(questPOIBlobPoint.X);
-            data << int16(questPOIBlobPoint.Y);
-            data << int16(questPOIBlobPoint.Z);
-        }
-
-        data.WriteBit(questPOIBlobData.AlwaysAllowMergingBlobs);
-        data.FlushBits();
-    }
-
-    return data;
-}
-
-WorldPacket const* WorldPackets::Query::QuestPOIQueryResponse::Write()
+WorldPacket const* QuestPOIQueryResponse::Write()
 {
     _worldPacket << int32(QuestPOIDataStats.size());
     _worldPacket << int32(QuestPOIDataStats.size());
@@ -405,14 +431,14 @@ WorldPacket const* WorldPackets::Query::QuestPOIQueryResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryQuestCompletionNPCs::Read()
+void QueryQuestCompletionNPCs::Read()
 {
     QuestCompletionNPCs.resize(_worldPacket.read<uint32>());
     if (!QuestCompletionNPCs.empty())
         _worldPacket.read(QuestCompletionNPCs.data(), QuestCompletionNPCs.size());
 }
 
-WorldPacket const* WorldPackets::Query::QuestCompletionNPCResponse::Write()
+WorldPacket const* QuestCompletionNPCResponse::Write()
 {
     _worldPacket << uint32(QuestCompletionNPCs.size());
     for (auto& quest : QuestCompletionNPCs)
@@ -426,12 +452,12 @@ WorldPacket const* WorldPackets::Query::QuestCompletionNPCResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryPetName::Read()
+void QueryPetName::Read()
 {
     _worldPacket >> UnitGUID;
 }
 
-WorldPacket const* WorldPackets::Query::QueryPetNameResponse::Write()
+WorldPacket const* QueryPetNameResponse::Write()
 {
     _worldPacket << UnitGUID;
     _worldPacket.WriteBit(Allow);
@@ -456,12 +482,12 @@ WorldPacket const* WorldPackets::Query::QueryPetNameResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::ItemTextQuery::Read()
+void ItemTextQuery::Read()
 {
     _worldPacket >> Id;
 }
 
-ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::ItemTextCache const& itemTextCache)
+ByteBuffer& operator<<(ByteBuffer& data, ItemTextCache const& itemTextCache)
 {
     data.WriteBits(itemTextCache.Text.length(), 13);
     data.FlushBits();
@@ -471,7 +497,7 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Query::ItemTextCache cons
     return data;
 }
 
-WorldPacket const* WorldPackets::Query::QueryItemTextResponse::Write()
+WorldPacket const* QueryItemTextResponse::Write()
 {
     _worldPacket.WriteBit(Valid);
     _worldPacket.FlushBits();
@@ -481,12 +507,12 @@ WorldPacket const* WorldPackets::Query::QueryItemTextResponse::Write()
     return &_worldPacket;
 }
 
-void WorldPackets::Query::QueryRealmName::Read()
+void QueryRealmName::Read()
 {
     _worldPacket >> VirtualRealmAddress;
 }
 
-WorldPacket const* WorldPackets::Query::RealmQueryResponse::Write()
+WorldPacket const* RealmQueryResponse::Write()
 {
     _worldPacket << uint32(VirtualRealmAddress);
     _worldPacket << uint8(LookupState);
@@ -494,4 +520,85 @@ WorldPacket const* WorldPackets::Query::RealmQueryResponse::Write()
         _worldPacket << NameInfo;
 
     return &_worldPacket;
+}
+
+void QueryTreasurePicker::Read()
+{
+    _worldPacket >> QuestID;
+    _worldPacket >> TreasurePickerID;
+}
+
+ByteBuffer& operator<<(ByteBuffer& data, TreasurePickItem const& treasurePickItem)
+{
+    data << treasurePickItem.Item;
+    data << uint32(treasurePickItem.Quantity);
+    data << OptionalInit(treasurePickItem.ContextFlags);
+    data.FlushBits();
+
+    if (treasurePickItem.ContextFlags)
+        data << As<int32>(*treasurePickItem.ContextFlags);
+
+    return data;
+}
+
+ByteBuffer& operator<<(ByteBuffer& data, TreasurePickCurrency const& treasurePickCurrency)
+{
+    data << uint32(treasurePickCurrency.CurrencyID);
+    data << uint32(treasurePickCurrency.Quantity);
+    data << OptionalInit(treasurePickCurrency.ContextFlags);
+    data.FlushBits();
+
+    if (treasurePickCurrency.ContextFlags)
+        data << As<int32>(*treasurePickCurrency.ContextFlags);
+
+    return data;
+}
+
+ByteBuffer& operator<<(ByteBuffer& data, TreasurePickerBonus const& treasurePickerBonus)
+{
+    data << uint32(treasurePickerBonus.Items.size());
+    data << uint32(treasurePickerBonus.Currencies.size());
+    data << uint64(treasurePickerBonus.Money);
+    data << Bits<1>(treasurePickerBonus.Context);
+    data.FlushBits();
+
+    for (TreasurePickItem const& treasurePickerItem : treasurePickerBonus.Items)
+        data << treasurePickerItem;
+
+    for (TreasurePickCurrency const& treasurePickCurrency : treasurePickerBonus.Currencies)
+        data << treasurePickCurrency;
+
+    return data;
+}
+
+ByteBuffer& operator<<(ByteBuffer& data, TreasurePickerPick const& treasurePickerPick)
+{
+    data << uint32(treasurePickerPick.Items.size());
+    data << uint32(treasurePickerPick.Currencies.size());
+    data << uint64(treasurePickerPick.Money);
+    data << uint32(treasurePickerPick.Bonuses.size());
+    data << int32(treasurePickerPick.Flags);
+    data << Bits<1>(treasurePickerPick.IsChoice);
+    data.FlushBits();
+
+    for (TreasurePickItem const& treasurePickItem : treasurePickerPick.Items)
+        data << treasurePickItem;
+
+    for (TreasurePickCurrency const& treasurePickCurrency : treasurePickerPick.Currencies)
+        data << treasurePickCurrency;
+
+    for (TreasurePickerBonus const& treasurePickerBonus : treasurePickerPick.Bonuses)
+        data << treasurePickerBonus;
+
+    return data;
+}
+
+WorldPacket const* TreasurePickerResponse::Write()
+{
+    _worldPacket << uint32(QuestID);
+    _worldPacket << uint32(TreasurePickerID);
+    _worldPacket << Pick;
+
+    return &_worldPacket;
+}
 }

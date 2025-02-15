@@ -35,7 +35,6 @@ EndContentData */
 #include "Player.h"
 #include "razorfen_downs.h"
 #include "ScriptedCreature.h"
-#include "ScriptedGossip.h"
 #include "TemporarySummon.h"
 
 /*###
@@ -58,7 +57,7 @@ enum Belnistrasz
     EVENT_FIREBALL               = 5,
     EVENT_FROST_NOVA             = 6,
 
-    PATH_ESCORT                  = 871710,
+    PATH_ESCORT                  = 6973680,
     POINT_REACH_IDOL             = 17,
 
     QUEST_EXTINGUISHING_THE_IDOL = 3525,
@@ -103,9 +102,10 @@ public:
                     DoCastSelf(SPELL_ARCANE_INTELLECT);
 
                 channeling = false;
+                me->SetCanMelee(true);
                 eventProgress = 0;
                 spawnerCount  = 0;
-                me->AddNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
+                me->SetNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
             }
         }
 
@@ -128,7 +128,7 @@ public:
             me->DespawnOrUnsummon(5s);
         }
 
-        void QuestAccept(Player* /*player*/, Quest const* quest) override
+        void OnQuestAccept(Player* /*player*/, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_EXTINGUISHING_THE_IDOL)
             {
@@ -145,6 +145,7 @@ public:
             if (type == WAYPOINT_MOTION_TYPE && id == POINT_REACH_IDOL)
             {
                 channeling = true;
+                me->SetCanMelee(false);
                 events.ScheduleEvent(EVENT_CHANNEL, 2s);
             }
         }
@@ -239,8 +240,6 @@ public:
                         break;
                 }
             }
-            if (!channeling)
-                DoMeleeAttackIfReady();
         }
 
     private:
@@ -352,7 +351,6 @@ public:
                         break;
                 }
             }
-            DoMeleeAttackIfReady();
         }
 
     private:
@@ -381,7 +379,7 @@ public:
 
         InstanceScript* instance;
 
-        bool GossipHello(Player* /*player*/) override
+        bool OnGossipHello(Player* /*player*/) override
         {
             me->SendCustomAnim(0);
             instance->SetData(DATA_WAVE, IN_PROGRESS);

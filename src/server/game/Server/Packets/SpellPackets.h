@@ -18,15 +18,18 @@
 #ifndef SpellPackets_h__
 #define SpellPackets_h__
 
-#include "CharacterPackets.h"
 #include "CombatLogPacketsCommon.h"
 #include "MovementInfo.h"
 #include "ObjectGuid.h"
 #include "Optional.h"
 #include "PacketUtilities.h"
 #include "Position.h"
-#include "SharedDefines.h"
 #include <array>
+
+namespace UF
+{
+    struct ChrCustomizationChoice;
+}
 
 namespace WorldPackets
 {
@@ -59,8 +62,8 @@ namespace WorldPackets
             void Read() override;
 
             int32 ChannelSpell = 0;
-            int32 Reason = 0;       // 40 = /run SpellStopCasting(), 16 = movement/SpellAuraInterruptFlags::Moving, 41 = turning/SpellAuraInterruptFlags::Turning
-                                    // does not match SpellCastResult enum
+            int32 Reason = 0; // 40 = /run SpellStopCasting(), 16 = movement/SpellAuraInterruptFlags::Moving, 41 = turning/SpellAuraInterruptFlags::Turning
+            // does not match SpellCastResult enum
         };
 
         class CancelGrowthAura final : public ClientPacket
@@ -79,6 +82,16 @@ namespace WorldPackets
             void Read() override { }
         };
 
+        class CancelModSpeedNoControlAuras final : public ClientPacket
+        {
+        public:
+            CancelModSpeedNoControlAuras(WorldPacket&& packet) : ClientPacket(CMSG_CANCEL_MOD_SPEED_NO_CONTROL_AURAS, std::move(packet)) { }
+
+            void Read() override;
+
+            ObjectGuid TargetGUID;
+        };
+
         class PetCancelAura final : public ClientPacket
         {
         public:
@@ -90,33 +103,6 @@ namespace WorldPackets
             uint32 SpellID = 0;
         };
 
-        class RequestCategoryCooldowns final : public ClientPacket
-        {
-        public:
-            RequestCategoryCooldowns(WorldPacket&& packet) : ClientPacket(CMSG_REQUEST_CATEGORY_COOLDOWNS, std::move(packet)) { }
-
-            void Read() override { }
-        };
-
-        class CategoryCooldown final : public ServerPacket
-        {
-        public:
-            struct CategoryCooldownInfo
-            {
-                CategoryCooldownInfo(uint32 category, int32 cooldown)
-                    : Category(category), ModCooldown(cooldown) { }
-
-                uint32 Category   = 0; ///< SpellCategory Id
-                int32 ModCooldown = 0; ///< Reduced Cooldown in ms
-            };
-
-            CategoryCooldown() : ServerPacket(SMSG_CATEGORY_COOLDOWN, 4) { }
-
-            WorldPacket const* Write() override;
-
-            std::vector<CategoryCooldownInfo> CategoryCooldowns;
-        };
-
         class SendKnownSpells final : public ServerPacket
         {
         public:
@@ -126,22 +112,19 @@ namespace WorldPackets
 
             bool InitialLogin = false;
             std::vector<uint32> KnownSpells;
-            std::vector<uint32> FavoriteSpells;         // tradeskill recipes
+            std::vector<uint32> FavoriteSpells; // tradeskill recipes
         };
 
         class UpdateActionButtons final : public ServerPacket
         {
         public:
-            static std::size_t constexpr NumActionButtons = 132;
+            static std::size_t constexpr NumActionButtons = 180;
 
-            UpdateActionButtons() : ServerPacket(SMSG_UPDATE_ACTION_BUTTONS, NumActionButtons * 8 + 1)
-            {
-                ActionButtons.fill(0);
-            }
+            UpdateActionButtons() : ServerPacket(SMSG_UPDATE_ACTION_BUTTONS, NumActionButtons * 8 + 1) { }
 
             WorldPacket const* Write() override;
 
-            std::array<uint64, NumActionButtons> ActionButtons;
+            std::array<uint64, NumActionButtons> ActionButtons = { };
             uint8 Reason = 0;
             /*
                 Reason can be 0, 1, 2
@@ -158,7 +141,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint64 Action = 0; ///< two packed uint32 (action and type)
+            uint64 Action = 0; ///< two packed values (action and type)
             uint8 Index = 0;
         };
 
@@ -212,7 +195,7 @@ namespace WorldPackets
         struct TargetLocation
         {
             ObjectGuid Transport;
-            Position Location;
+            TaggedPosition<Position::XYZ> Location;
         };
 
         struct SpellTargetData
@@ -240,10 +223,12 @@ namespace WorldPackets
             uint32 Quantity = 0;
         };
 
-        struct SpellOptionalReagent
+        struct SpellCraftingReagent
         {
             int32 ItemID = 0;
-            int32 Slot = 0;
+            int32 DataSlotIndex = 0;
+            int32 Quantity = 0;
+            Optional<uint8> Source;
         };
 
         struct SpellExtraCurrencyCost
@@ -262,8 +247,11 @@ namespace WorldPackets
             MissileTrajectoryRequest MissileTrajectory;
             Optional<MovementInfo> MoveUpdate;
             std::vector<SpellWeight> Weight;
-            Array<SpellOptionalReagent, 3> OptionalReagents;
+            Array<SpellCraftingReagent, 6> OptionalReagents;
+            Array<SpellCraftingReagent, 6> RemovedModifications;
             Array<SpellExtraCurrencyCost, 5 /*MAX_ITEM_EXT_COST_CURRENCIES*/> OptionalCurrencies;
+            Optional<uint64> CraftingOrderID;
+            uint8 CraftingFlags = 0; // 1 = ApplyConcentration
             ObjectGuid CraftingNPC;
             int32 Misc[2] = { };
         };
@@ -318,7 +306,7 @@ namespace WorldPackets
             SpellHitStatus() { }
             SpellHitStatus(uint8 reason) : Reason(reason) { }
 
-            uint8 Reason;
+            uint8 Reason = 0;
         };
 
         struct SpellMissStatus
@@ -347,12 +335,6 @@ namespace WorldPackets
         {
             uint32 TravelTime = 0;
             float Pitch = 0.0f;
-        };
-
-        struct SpellAmmo
-        {
-            int32 DisplayID = 0;
-            int8 InventoryType = 0;
         };
 
         struct CreatureImmunities
@@ -387,7 +369,7 @@ namespace WorldPackets
             std::vector<SpellPowerData> RemainingPower;
             Optional<RuneData> RemainingRunes;
             MissileTrajectoryResult MissileTrajectory;
-            SpellAmmo Ammo;
+            int32 AmmoDisplayID = 0;
             uint8 DestLocSpellCastIndex = 0;
             std::vector<TargetLocation> TargetPoints;
             CreatureImmunities Immunities;
@@ -414,6 +396,15 @@ namespace WorldPackets
             SpellCastData Cast;
         };
 
+        struct LearnedSpellInfo
+        {
+            int32 SpellID = 0;
+            bool Favorite = false;
+            Optional<int32> EquipableSpellInvSlot;
+            Optional<int32> Superceded;
+            Optional<int32> TraitDefinitionID;
+        };
+
         class LearnedSpells final : public ServerPacket
         {
         public:
@@ -421,8 +412,7 @@ namespace WorldPackets
 
             WorldPacket const* Write() override;
 
-            std::vector<int32> SpellID;
-            std::vector<int32> FavoriteSpellID;
+            std::vector<LearnedSpellInfo> ClientLearnedSpellData;
             uint32 SpecializationID = 0;
             bool SuppressMessaging = false;
         };
@@ -434,9 +424,7 @@ namespace WorldPackets
 
             WorldPacket const* Write() override;
 
-            std::vector<int32> SpellID;
-            std::vector<int32> Superceded;
-            std::vector<int32> FavoriteSpellID;
+            std::vector<LearnedSpellInfo> ClientLearnedSpellData;
         };
 
         class SpellFailure final : public ServerPacket
@@ -538,7 +526,7 @@ namespace WorldPackets
             WorldPacket const* Write() override;
 
             bool IsPet = false;
-            int32 SpellID;
+            int32 SpellID = 0;
         };
 
         class ClearCooldowns final : public ServerPacket
@@ -608,8 +596,8 @@ namespace WorldPackets
             int32 CategoryRecoveryTime = 0;
             float ModRate = 1.0f;
             bool OnHold = false;
-            Optional<uint32> unused622_1;   ///< This field is not used for anything in the client in 6.2.2.20444
-            Optional<uint32> unused622_2;   ///< This field is not used for anything in the client in 6.2.2.20444
+            Optional<int32> RecoveryTimeStartOffset;
+            Optional<int32> CategoryRecoveryTimeStartOffset;
         };
 
         class SendSpellHistory final : public ServerPacket
@@ -726,6 +714,7 @@ namespace WorldPackets
             WorldPacket const* Write() override;
 
             ObjectGuid Target; // Exclusive with TargetLocation
+            ObjectGuid TargetTransport;
             TaggedPosition<Position::XYZ> SourceLocation;
             int32 SpellVisualID = 0;
             bool SpeedAsTime = false;
@@ -745,7 +734,7 @@ namespace WorldPackets
 
             ObjectGuid Source;
             ObjectGuid Target;
-            ObjectGuid Transport; // Used when Target = Empty && (SpellVisual::Flags & 0x400) == 0
+            ObjectGuid Transport;                         // Used when Target = Empty && (SpellVisual::Flags & 0x400) == 0
             TaggedPosition<Position::XYZ> TargetPosition; // Overrides missile destination for SpellVisual::SpellVisualMissileSetID
             uint32 SpellVisualID = 0;
             float TravelSpeed = 0.0f;
@@ -843,6 +832,82 @@ namespace WorldPackets
             int32 TimeRemaining = 0;
         };
 
+        class SpellEmpowerStart final : public ServerPacket
+        {
+        public:
+            SpellEmpowerStart() : ServerPacket(SMSG_SPELL_EMPOWER_START, 16 + 16 + 4 + 8 + 4 + 4 + 4 + 1) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid CastID;
+            ObjectGuid CasterGUID;
+            int32 SpellID = 0;
+            SpellCastVisual Visual;
+            Duration<Milliseconds, uint32> EmpowerDuration;
+            Duration<Milliseconds, uint32> MinHoldTime;
+            Duration<Milliseconds, uint32> HoldAtMaxTime;
+            std::vector<ObjectGuid> Targets;
+            std::vector<Duration<Milliseconds, uint32>> StageDurations;
+            Optional<SpellChannelStartInterruptImmunities> InterruptImmunities;
+            Optional<SpellTargetedHealPrediction> HealPrediction;
+        };
+
+        class SpellEmpowerUpdate final : public ServerPacket
+        {
+        public:
+            SpellEmpowerUpdate() : ServerPacket(SMSG_SPELL_EMPOWER_UPDATE, 16 + 16 + 4 + 4 + 1) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid CastID;
+            ObjectGuid CasterGUID;
+            Duration<Milliseconds, int32> TimeRemaining;
+            std::vector<Duration<Milliseconds, uint32>> StageDurations;
+            uint8 Status = 0;
+        };
+
+        class SetEmpowerMinHoldStagePercent final : public ClientPacket
+        {
+        public:
+            SetEmpowerMinHoldStagePercent(WorldPacket&& packet) : ClientPacket(CMSG_SET_EMPOWER_MIN_HOLD_STAGE_PERCENT, std::move(packet)) { }
+
+            void Read() override;
+
+            float MinHoldStagePercent = 1.0f;
+        };
+
+        class SpellEmpowerRelease final : public ClientPacket
+        {
+        public:
+            SpellEmpowerRelease(WorldPacket&& packet) : ClientPacket(CMSG_SPELL_EMPOWER_RELEASE, std::move(packet)) { }
+
+            void Read() override;
+
+            int32 SpellID = 0;
+        };
+
+        class SpellEmpowerRestart final : public ClientPacket
+        {
+        public:
+            SpellEmpowerRestart(WorldPacket&& packet) : ClientPacket(CMSG_SPELL_EMPOWER_RESTART, std::move(packet)) { }
+
+            void Read() override;
+
+            int32 SpellID = 0;
+        };
+
+        class SpellEmpowerSetStage final : public ServerPacket
+        {
+        public:
+            SpellEmpowerSetStage() : ServerPacket(SMSG_SPELL_EMPOWER_SET_STAGE, 16 + 16 + 4) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid CastID;
+            ObjectGuid CasterGUID;
+            int32 Stage = 0;
+        };
+
         class ResurrectRequest final : public ServerPacket
         {
         public:
@@ -887,13 +952,13 @@ namespace WorldPackets
             void Read() override;
 
             ObjectGuid UnitGUID;
-            uint32 DisplayID = 0;
         };
 
         class MirrorImageComponentedData final : public ServerPacket
         {
         public:
-            MirrorImageComponentedData() : ServerPacket(SMSG_MIRROR_IMAGE_COMPONENTED_DATA, 8 + 4 + 8 * 1 + 8 + 11 * 4) { }
+            MirrorImageComponentedData();
+            ~MirrorImageComponentedData();
 
             WorldPacket const* Write() override;
 
@@ -903,7 +968,7 @@ namespace WorldPackets
             uint8 RaceID = 0;
             uint8 Gender = 0;
             uint8 ClassID = 0;
-            std::vector<Character::ChrCustomizationChoice> Customizations;
+            std::vector<UF::ChrCustomizationChoice> Customizations;
             ObjectGuid GuildGUID;
 
             std::vector<int32> ItemDisplayID;
@@ -986,7 +1051,7 @@ namespace WorldPackets
 
             ObjectGuid Guid;
             ObjectGuid CastID;
-            uint16 MoveMsgID = 0;
+            uint32 MoveMsgID = 0;
             int32 SpellID = 0;
             float Pitch = 0.0f;
             float Speed = 0.0f;
@@ -1040,6 +1105,24 @@ namespace WorldPackets
             uint32 Result = 0;
         };
 
+        class ApplyMountEquipmentResult final : public ServerPacket
+        {
+        public:
+            enum ApplyResult : int32
+            {
+                Success = 0,
+                Failure = 1
+            };
+
+            ApplyMountEquipmentResult() : ServerPacket(SMSG_APPLY_MOUNT_EQUIPMENT_RESULT, 16 + 4 + 1) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid ItemGUID;
+            int32 ItemID = 0;
+            ApplyResult Result = Success;
+        };
+
         class MissileCancel final : public ServerPacket
         {
         public:
@@ -1051,9 +1134,38 @@ namespace WorldPackets
             bool Reverse = false;
             int32 SpellID = 0;
         };
+
+        class TradeSkillSetFavorite final : public ClientPacket
+        {
+        public:
+            TradeSkillSetFavorite(WorldPacket&& packet) : ClientPacket(CMSG_TRADE_SKILL_SET_FAVORITE, std::move(packet)) { }
+
+            void Read() override;
+
+            int32 RecipeID = 0;
+            bool IsFavorite = false;
+        };
+
+        class KeyboundOverride final : public ClientPacket
+        {
+        public:
+            KeyboundOverride(WorldPacket&& packet) : ClientPacket(CMSG_KEYBOUND_OVERRIDE,  std::move(packet)) { }
+
+            void Read() override;
+
+            uint16 OverrideID = 0;
+        };
+
+        class CancelQueuedSpell final : public ClientPacket
+        {
+        public:
+            CancelQueuedSpell(WorldPacket&& packet) : ClientPacket(CMSG_CANCEL_QUEUED_SPELL, std::move(packet)) { }
+
+            void Read() override { }
+        };
+
+        ByteBuffer& operator>>(ByteBuffer& buffer, SpellCastRequest& request);
     }
 }
-
-ByteBuffer& operator>>(ByteBuffer& buffer, WorldPackets::Spells::SpellCastRequest& request);
 
 #endif // SpellPackets_h__

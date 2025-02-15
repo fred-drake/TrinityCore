@@ -18,6 +18,7 @@
 #include "ScriptMgr.h"
 #include "AreaBoundary.h"
 #include "azjol_nerub.h"
+#include "Containers.h"
 #include "GameObject.h"
 #include "InstanceScript.h"
 #include "MotionMaster.h"
@@ -117,8 +118,8 @@ struct boss_anub_arak : public BossAI
     void Reset() override
     {
         BossAI::Reset();
-        me->RemoveUnitFlag(UnitFlags(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE));
-        instance->DoStopCriteriaTimer(CriteriaStartEvent::SendEvent, ACHIEV_GOTTA_GO_START_EVENT);
+        me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+        me->SetUninteractible(false);
         _nextSubmerge = 75;
         _petCount = 0;
     }
@@ -135,7 +136,7 @@ struct boss_anub_arak : public BossAI
             door2->SetGoState(GO_STATE_ACTIVE);
 
         Talk(SAY_AGGRO);
-        instance->DoStartCriteriaTimer(CriteriaStartEvent::SendEvent, ACHIEV_GOTTA_GO_START_EVENT);
+        instance->TriggerGameEvent(ACHIEV_GOTTA_GO_START_EVENT);
 
         events.SetPhase(PHASE_EMERGE);
         events.ScheduleEvent(EVENT_CLOSE_DOOR, 5s);
@@ -148,7 +149,7 @@ struct boss_anub_arak : public BossAI
         me->SummonCreatureGroup(SUMMON_GROUP_WORLD_TRIGGER_GUARDIAN, &summoned);
         if (summoned.empty()) // something went wrong
         {
-            EnterEvadeMode(EVADE_REASON_OTHER);
+            EnterEvadeMode(EvadeReason::Other);
             return;
         }
         _guardianTrigger = (*summoned.begin())->GetGUID();
@@ -157,7 +158,7 @@ struct boss_anub_arak : public BossAI
             _assassinTrigger = trigger->GetGUID();
         else
         {
-            EnterEvadeMode(EVADE_REASON_OTHER);
+            EnterEvadeMode(EvadeReason::Other);
             return;
         }
     }
@@ -221,7 +222,7 @@ struct boss_anub_arak : public BossAI
                         events.Repeat(11s);
                     }
                     else
-                        EnterEvadeMode(EVADE_REASON_OTHER);
+                        EnterEvadeMode(EvadeReason::Other);
                     break;
                 }
                 case EVENT_ASSASSIN:
@@ -238,7 +239,7 @@ struct boss_anub_arak : public BossAI
                             _assassinCount = 0;
                     }
                     else // something went wrong
-                        EnterEvadeMode(EVADE_REASON_OTHER);
+                        EnterEvadeMode(EvadeReason::Other);
                     break;
                 case EVENT_GUARDIAN:
                     if (Creature* trigger = ObjectAccessor::GetCreature(*me, _guardianTrigger))
@@ -254,7 +255,7 @@ struct boss_anub_arak : public BossAI
                             _guardianCount = 0;
                     }
                     else
-                        EnterEvadeMode(EVADE_REASON_OTHER);
+                        EnterEvadeMode(EvadeReason::Other);
                     break;
                 case EVENT_VENOMANCER:
                     if (Creature* trigger = ObjectAccessor::GetCreature(*me, _guardianTrigger))
@@ -270,7 +271,7 @@ struct boss_anub_arak : public BossAI
                             _venomancerCount = 0;
                     }
                     else
-                        EnterEvadeMode(EVADE_REASON_OTHER);
+                        EnterEvadeMode(EvadeReason::Other);
                     break;
                 default:
                     break;
@@ -279,8 +280,6 @@ struct boss_anub_arak : public BossAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        DoMeleeAttackIfReady();
     }
 
     void JustDied(Unit* /*killer*/) override
@@ -304,7 +303,7 @@ struct boss_anub_arak : public BossAI
                 if (Creature* creature = ObjectAccessor::GetCreature(*me, guid))
                     JustSummoned(creature);
                 else // something has gone horribly wrong
-                    EnterEvadeMode(EVADE_REASON_OTHER);
+                    EnterEvadeMode(EvadeReason::Other);
                 break;
             }
             case GUID_TYPE_IMPALE:
@@ -321,14 +320,15 @@ struct boss_anub_arak : public BossAI
             case ACTION_PET_DIED:
                 if (!_petCount) // underflow check - something has gone horribly wrong
                 {
-                    EnterEvadeMode(EVADE_REASON_OTHER);
+                    EnterEvadeMode(EvadeReason::Other);
                     return;
                 }
                 if (!--_petCount) // last pet died, emerge
                 {
                     me->RemoveAurasDueToSpell(SPELL_SUBMERGE);
                     me->RemoveAurasDueToSpell(SPELL_IMPALE_AURA);
-                    me->RemoveUnitFlag(UnitFlags(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE));
+                    me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                    me->SetUninteractible(false);
                     DoCastSelf(SPELL_EMERGE);
                     events.SetPhase(PHASE_EMERGE);
                     events.ScheduleEvent(EVENT_POUND, 13s, 18s, 0, PHASE_EMERGE);
@@ -337,12 +337,12 @@ struct boss_anub_arak : public BossAI
                 }
                 break;
             case ACTION_PET_EVADE:
-                EnterEvadeMode(EVADE_REASON_OTHER);
+                EnterEvadeMode(EvadeReason::Other);
                 break;
         }
     }
 
-    void DamageTaken(Unit* /*source*/, uint32& damage) override
+    void DamageTaken(Unit* /*source*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (me->HasAura(SPELL_SUBMERGE))
             damage = 0;
@@ -358,7 +358,8 @@ struct boss_anub_arak : public BossAI
     {
         if (spellInfo->Id == SPELL_SUBMERGE)
         {
-            me->AddUnitFlag(UnitFlags(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE));
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUninteractible(true);
             me->RemoveAurasDueToSpell(SPELL_LEECHING_SWARM);
             DoCastSelf(SPELL_IMPALE_AURA, true);
 
@@ -498,10 +499,7 @@ struct npc_anubarak_anub_ar_assassin : public npc_anubarak_pet_template
         if (!UpdateVictim())
             return;
 
-        _scheduler.Update(diff, [this]
-        {
-            DoMeleeAttackIfReady();
-        });
+        _scheduler.Update(diff);
     }
 
     void MovementInform(uint32 /*type*/, uint32 id) override
@@ -540,10 +538,7 @@ struct npc_anubarak_anub_ar_guardian : public npc_anubarak_pet_template
         if (!UpdateVictim())
             return;
 
-        _scheduler.Update(diff, [this]
-        {
-            DoMeleeAttackIfReady();
-        });
+        _scheduler.Update(diff);
     }
 
 private:
@@ -573,10 +568,7 @@ struct npc_anubarak_anub_ar_venomancer : public npc_anubarak_pet_template
         if (!UpdateVictim())
             return;
 
-        _scheduler.Update(diff, [this]
-        {
-            DoMeleeAttackIfReady();
-        });
+        _scheduler.Update(diff);
     }
 
 private:
@@ -600,10 +592,9 @@ struct npc_anubarak_impale_target : public NullCreatureAI
     }
 };
 
+// 53472, 59433 - Pound
 class spell_anubarak_pound : public AuraScript
 {
-    PrepareAuraScript(spell_anubarak_pound);
-
     bool Validate(SpellInfo const* /*spell*/) override
     {
         return ValidateSpellInfo({ SPELL_POUND_DAMAGE });
@@ -621,10 +612,9 @@ class spell_anubarak_pound : public AuraScript
     }
 };
 
+// 53520 - Carrion Beetles
 class spell_anubarak_carrion_beetles : public AuraScript
 {
-    PrepareAuraScript(spell_anubarak_carrion_beetles);
-
     bool Validate(SpellInfo const* /*spell*/) override
     {
         return ValidateSpellInfo({ SPELL_CARRION_BEETLE });
@@ -644,14 +634,14 @@ class spell_anubarak_carrion_beetles : public AuraScript
 
 void AddSC_boss_anub_arak()
 {
-    RegisterCreatureAIWithFactory(boss_anub_arak, GetAzjolNerubAI);
+    RegisterAzjolNerubCreatureAI(boss_anub_arak);
 
-    RegisterCreatureAIWithFactory(npc_anubarak_anub_ar_darter, GetAzjolNerubAI);
-    RegisterCreatureAIWithFactory(npc_anubarak_anub_ar_assassin, GetAzjolNerubAI);
-    RegisterCreatureAIWithFactory(npc_anubarak_anub_ar_guardian, GetAzjolNerubAI);
-    RegisterCreatureAIWithFactory(npc_anubarak_anub_ar_venomancer, GetAzjolNerubAI);
-    RegisterCreatureAIWithFactory(npc_anubarak_impale_target, GetAzjolNerubAI);
+    RegisterAzjolNerubCreatureAI(npc_anubarak_anub_ar_darter);
+    RegisterAzjolNerubCreatureAI(npc_anubarak_anub_ar_assassin);
+    RegisterAzjolNerubCreatureAI(npc_anubarak_anub_ar_guardian);
+    RegisterAzjolNerubCreatureAI(npc_anubarak_anub_ar_venomancer);
+    RegisterAzjolNerubCreatureAI(npc_anubarak_impale_target);
 
-    RegisterAuraScript(spell_anubarak_pound);
-    RegisterAuraScript(spell_anubarak_carrion_beetles);
+    RegisterSpellScript(spell_anubarak_pound);
+    RegisterSpellScript(spell_anubarak_carrion_beetles);
 }

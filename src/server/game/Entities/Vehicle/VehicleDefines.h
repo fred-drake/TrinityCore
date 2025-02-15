@@ -23,6 +23,8 @@
 #include <vector>
 #include <map>
 
+class Map;
+class WorldObject;
 struct VehicleSeatEntry;
 
 enum PowerType
@@ -87,13 +89,13 @@ enum class VehicleExitParameters
 struct PassengerInfo
 {
     ObjectGuid Guid;
-    bool IsUnselectable;
+    bool IsUninteractible;
     bool IsGravityDisabled;
 
     void Reset()
     {
         Guid.Clear();
-        IsUnselectable = false;
+        IsUninteractible = false;
         IsGravityDisabled = false;
     }
 };
@@ -129,13 +131,14 @@ struct VehicleSeat
 
 struct VehicleAccessory
 {
-    VehicleAccessory(uint32 entry, int8 seatId, bool isMinion, uint8 summonType, uint32 summonTime) :
-        AccessoryEntry(entry), IsMinion(isMinion), SummonTime(summonTime), SeatId(seatId), SummonedType(summonType) { }
+    VehicleAccessory(uint32 entry, int8 seatId, bool isMinion, uint8 summonType, uint32 summonTime, Optional<uint32> rideSpellID) :
+        AccessoryEntry(entry), IsMinion(isMinion), SummonTime(summonTime), SeatId(seatId), SummonedType(summonType), RideSpellID(rideSpellID) { }
     uint32 AccessoryEntry;
     bool IsMinion;
     uint32 SummonTime;
     int8 SeatId;
     uint8 SummonedType;
+    Optional<uint32> RideSpellID;
 };
 
 struct VehicleTemplate
@@ -155,11 +158,21 @@ protected:
     virtual ~TransportBase() { }
 
 public:
+    virtual ObjectGuid GetTransportGUID() const = 0;
+
     /// This method transforms supplied transport offsets into global coordinates
     virtual void CalculatePassengerPosition(float& x, float& y, float& z, float* o = nullptr) const = 0;
 
     /// This method transforms supplied global coordinates into local offsets
     virtual void CalculatePassengerOffset(float& x, float& y, float& z, float* o = nullptr) const = 0;
+
+    virtual float GetTransportOrientation() const = 0;
+
+    virtual void AddPassenger(WorldObject* passenger) = 0;
+
+    virtual TransportBase* RemovePassenger(WorldObject* passenger) = 0;
+
+    void UpdatePassengerPosition(Map* map, WorldObject* passenger, float x, float y, float z, float o, bool setHomePosition);
 
     static void CalculatePassengerPosition(float& x, float& y, float& z, float* o, float transX, float transY, float transZ, float transO)
     {
@@ -184,6 +197,8 @@ public:
         y = (iny - inx * std::tan(transO)) / (std::cos(transO) + std::sin(transO) * std::tan(transO));
         x = (inx + iny * std::tan(transO)) / (std::cos(transO) + std::sin(transO) * std::tan(transO));
     }
+
+    virtual int32 GetMapIdForSpawning() const = 0;
 };
 
 #endif

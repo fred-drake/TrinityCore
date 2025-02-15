@@ -284,8 +284,6 @@ struct boss_ick : public BossAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        DoMeleeAttackIfReady();
     }
 
 private:
@@ -318,7 +316,7 @@ struct boss_krick : public ScriptedAI
         Initialize();
 
         me->SetReactState(REACT_PASSIVE);
-        me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+        me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
     }
 
     void KilledUnit(Unit* victim) override
@@ -513,10 +511,9 @@ private:
     ObjectGuid _tyrannusGUID;
 };
 
+// 69012 - Explosive Barrage
 class spell_krick_explosive_barrage : public AuraScript
 {
-    PrepareAuraScript(spell_krick_explosive_barrage);
-
     void HandlePeriodicTick(AuraEffect const* /*aurEff*/)
     {
         PreventDefaultAction();
@@ -539,10 +536,9 @@ class spell_krick_explosive_barrage : public AuraScript
     }
 };
 
+// 69263 - Explosive Barrage
 class spell_ick_explosive_barrage : public AuraScript
 {
-    PrepareAuraScript(spell_ick_explosive_barrage);
-
     void HandleEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         Unit* caster = GetCaster();
@@ -570,10 +566,9 @@ class spell_ick_explosive_barrage : public AuraScript
     }
 };
 
+// 44851 - Hasty Grow
 class spell_exploding_orb_hasty_grow : public AuraScript
 {
-    PrepareAuraScript(spell_exploding_orb_hasty_grow);
-
     void OnStackChange(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         if (GetStackAmount() == 15)
@@ -594,10 +589,9 @@ class spell_exploding_orb_hasty_grow : public AuraScript
     }
 };
 
+// 68987 - Pursuit
 class spell_krick_pursuit : public SpellScript
 {
-    PrepareSpellScript(spell_krick_pursuit);
-
     void HandleScriptEffect(SpellEffIndex /*effIndex*/)
     {
         Unit* target = GetHitUnit();
@@ -619,8 +613,6 @@ class spell_krick_pursuit : public SpellScript
 
 class spell_krick_pursuit_AuraScript : public AuraScript
 {
-    PrepareAuraScript(spell_krick_pursuit_AuraScript);
-
     void HandleExtraEffect(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         Unit* caster = GetCaster();
@@ -636,10 +628,9 @@ class spell_krick_pursuit_AuraScript : public AuraScript
     }
 };
 
+// 69029, 70850 - Pursuit Confusion
 class spell_krick_pursuit_confusion : public AuraScript
 {
-    PrepareAuraScript(spell_krick_pursuit_confusion);
-
     void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         GetTarget()->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_MOD_TAUNT, true);
@@ -663,9 +654,9 @@ void AddSC_boss_ick()
 {
     RegisterPitOfSaronCreatureAI(boss_ick);
     RegisterPitOfSaronCreatureAI(boss_krick);
-    RegisterAuraScript(spell_krick_explosive_barrage);
-    RegisterAuraScript(spell_ick_explosive_barrage);
-    RegisterAuraScript(spell_exploding_orb_hasty_grow);
+    RegisterSpellScript(spell_krick_explosive_barrage);
+    RegisterSpellScript(spell_ick_explosive_barrage);
+    RegisterSpellScript(spell_exploding_orb_hasty_grow);
     RegisterSpellAndAuraScriptPair(spell_krick_pursuit, spell_krick_pursuit_AuraScript);
-    RegisterAuraScript(spell_krick_pursuit_confusion);
+    RegisterSpellScript(spell_krick_pursuit_confusion);
 }

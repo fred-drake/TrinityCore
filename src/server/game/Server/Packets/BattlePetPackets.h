@@ -200,7 +200,7 @@ namespace WorldPackets
             void Read() override;
 
             ObjectGuid PetGuid;
-            uint32 Flags = 0;
+            uint16 Flags = 0;
             uint8 ControlType = 0;
         };
 
@@ -249,6 +249,16 @@ namespace WorldPackets
         {
         public:
             BattlePetSummon(WorldPacket&& packet) : ClientPacket(CMSG_BATTLE_PET_SUMMON, std::move(packet)) { }
+
+            void Read() override;
+
+            ObjectGuid PetGuid;
+        };
+
+        class BattlePetUpdateNotify final : public ClientPacket
+        {
+        public:
+            BattlePetUpdateNotify(WorldPacket&& packet) : ClientPacket(CMSG_BATTLE_PET_UPDATE_NOTIFY, std::move(packet)) { }
 
             void Read() override;
 

@@ -23,6 +23,7 @@ SDCategory: Trial of the Champion
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "Containers.h"
 #include "InstanceScript.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
@@ -125,14 +126,13 @@ class OrientationCheck
         Unit* caster;
 };
 
+// 66862, 67681 - Radiance
 class spell_eadric_radiance : public SpellScriptLoader
 {
     public:
         spell_eadric_radiance() : SpellScriptLoader("spell_eadric_radiance") { }
         class spell_eadric_radiance_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_eadric_radiance_SpellScript);
-
             void FilterTargets(std::list<WorldObject*>& unitList)
             {
                 unitList.remove_if(OrientationCheck(GetCaster()));
@@ -162,7 +162,7 @@ public:
             Initialize();
             instance = creature->GetInstanceScript();
             creature->SetReactState(REACT_PASSIVE);
-            creature->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         }
 
         void Initialize()
@@ -189,7 +189,7 @@ public:
             Initialize();
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             if (damage >= me->GetHealth())
             {
@@ -205,7 +205,7 @@ public:
             if (MovementType != POINT_MOTION_TYPE)
                 return;
 
-            instance->SetData(BOSS_ARGENT_CHALLENGE_E, DONE);
+            instance->SetBossState(BOSS_ARGENT_CHALLENGE_E, DONE);
 
             me->DisappearAndDie();
         }
@@ -249,8 +249,6 @@ public:
 
                 uiRadianceTimer = 16000;
             } else uiRadianceTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -273,7 +271,7 @@ public:
             instance = creature->GetInstanceScript();
 
             creature->SetReactState(REACT_PASSIVE);
-            creature->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             creature->RestoreFaction();
         }
 
@@ -317,7 +315,7 @@ public:
                 me->RemoveAura(SPELL_SHIELD);
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
+        void DamageTaken(Unit* /*done_by*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
         {
             if (damage >= me->GetHealth())
             {
@@ -333,7 +331,7 @@ public:
             if (MovementType != POINT_MOTION_TYPE || Point != 0)
                 return;
 
-            instance->SetData(BOSS_ARGENT_CHALLENGE_P, DONE);
+            instance->SetBossState(BOSS_ARGENT_CHALLENGE_P, DONE);
 
             me->DisappearAndDie();
         }
@@ -406,8 +404,6 @@ public:
 
                 bHealth = true;
             }
-
-            DoMeleeAttackIfReady();
         }
 
         void JustSummoned(Creature* summon) override
@@ -480,8 +476,6 @@ public:
                 }
                 uiShadowPastTimer = 5000;
             }else uiShadowPastTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
@@ -546,13 +540,13 @@ public:
                     switch (uiType)
                     {
                         case 0:
-                            AddWaypoint(0, 712.14f, 628.42f, 411.88f);
+                            AddWaypoint(0, 712.14f, 628.42f, 411.88f, true);
                             break;
                         case 1:
-                            AddWaypoint(0, 742.44f, 650.29f, 411.79f);
+                            AddWaypoint(0, 742.44f, 650.29f, 411.79f, true);
                             break;
                         case 2:
-                            AddWaypoint(0, 783.33f, 615.29f, 411.84f);
+                            AddWaypoint(0, 783.33f, 615.29f, 411.84f, true);
                             break;
                     }
                     break;
@@ -560,13 +554,13 @@ public:
                     switch (uiType)
                     {
                         case 0:
-                            AddWaypoint(0, 713.12f, 632.97f, 411.90f);
+                            AddWaypoint(0, 713.12f, 632.97f, 411.90f, true);
                             break;
                         case 1:
-                            AddWaypoint(0, 746.73f, 650.24f, 411.56f);
+                            AddWaypoint(0, 746.73f, 650.24f, 411.56f, true);
                             break;
                         case 2:
-                            AddWaypoint(0, 781.32f, 610.54f, 411.82f);
+                            AddWaypoint(0, 781.32f, 610.54f, 411.82f, true);
                             break;
                     }
                     break;
@@ -574,30 +568,20 @@ public:
                     switch (uiType)
                     {
                         case 0:
-                            AddWaypoint(0, 715.06f, 637.07f, 411.91f);
+                            AddWaypoint(0, 715.06f, 637.07f, 411.91f, true);
                             break;
                         case 1:
-                            AddWaypoint(0, 750.72f, 650.20f, 411.77f);
+                            AddWaypoint(0, 750.72f, 650.20f, 411.77f, true);
                             break;
                         case 2:
-                            AddWaypoint(0, 779.77f, 607.03f, 411.81f);
+                            AddWaypoint(0, 779.77f, 607.03f, 411.81f, true);
                             break;
                     }
                     break;
             }
 
-            Start(false, true);
+            Start(false);
             uiWaypoint = uiType;
-        }
-
-        void UpdateAI(uint32 uiDiff) override
-        {
-            EscortAI::UpdateAI(uiDiff);
-
-            if (!UpdateVictim())
-                return;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
@@ -649,8 +633,6 @@ class spell_paletress_summon_memory : public SpellScriptLoader
 
         class spell_paletress_summon_memory_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_paletress_summon_memory_SpellScript);
-
             bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 return ValidateSpellInfo(memorySpellId);

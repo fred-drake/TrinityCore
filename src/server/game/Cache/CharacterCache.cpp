@@ -23,7 +23,6 @@
 #include "Player.h"
 #include "Timer.h"
 #include "World.h"
-#include "WorldPacket.h"
 #include <unordered_map>
 
 namespace
@@ -86,7 +85,7 @@ void CharacterCache::LoadCharacterCacheStorage()
             fields[4].GetUInt8() /*gender*/, fields[3].GetUInt8() /*race*/, fields[5].GetUInt8() /*class*/, fields[6].GetUInt8() /*level*/, fields[7].GetUInt32() != 0);
     } while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", "Loaded character infos for " SZFMTD " characters in %u ms", _characterCacheStore.size(), GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", "Loaded character infos for {} characters in {} ms", _characterCacheStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
 /*
@@ -108,7 +107,8 @@ void CharacterCache::AddCharacterCacheEntry(ObjectGuid const& guid, uint32 accou
     data.IsDeleted = isDeleted;
 
     // Fill Name to Guid Store
-    _characterCacheByNameStore[name] = &data;
+    if (!isDeleted)
+        _characterCacheByNameStore[name] = &data;
 }
 
 void CharacterCache::DeleteCharacterCacheEntry(ObjectGuid const& guid, std::string const& name)
@@ -187,18 +187,20 @@ void CharacterCache::UpdateCharacterArenaTeamId(ObjectGuid const& guid, uint8 sl
     itr->second.ArenaTeamId[slot] = arenaTeamId;
 }
 
-void CharacterCache::UpdateCharacterInfoDeleted(ObjectGuid const& guid, bool deleted, std::string const* name /*=nullptr*/)
+void CharacterCache::UpdateCharacterInfoDeleted(ObjectGuid const& guid, bool deleted, std::string const& name /*=nullptr*/)
 {
     auto itr = _characterCacheStore.find(guid);
     if (itr == _characterCacheStore.end())
         return;
 
+    if (deleted)
+        _characterCacheByNameStore.erase(itr->second.Name);
+    else
+        _characterCacheByNameStore[name] = &itr->second;
+
+    itr->second.Name = name;
     itr->second.IsDeleted = deleted;
-
-    if (name)
-        itr->second.Name = *name;
 }
-
 
 /*
 Getters
@@ -245,11 +247,11 @@ bool CharacterCache::GetCharacterNameByGuid(ObjectGuid guid, std::string& name) 
     return true;
 }
 
-uint32 CharacterCache::GetCharacterTeamByGuid(ObjectGuid guid) const
+Team CharacterCache::GetCharacterTeamByGuid(ObjectGuid guid) const
 {
     auto itr = _characterCacheStore.find(guid);
     if (itr == _characterCacheStore.end())
-        return 0;
+        return TEAM_OTHER;
 
     return Player::TeamForRace(itr->second.Race);
 }

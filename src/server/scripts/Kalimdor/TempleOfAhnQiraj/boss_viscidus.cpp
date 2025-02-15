@@ -18,7 +18,6 @@
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
 #include "MotionMaster.h"
-#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "SpellInfo.h"
 #include "temple_of_ahnqiraj.h"
@@ -112,7 +111,7 @@ class boss_viscidus : public CreatureScript
                 Initialize();
             }
 
-            void DamageTaken(Unit* attacker, uint32& /*damage*/) override
+            void DamageTaken(Unit* attacker, uint32& /*damage*/, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
             {
                 if (_phase != PHASE_MELEE)
                     return;
@@ -126,6 +125,7 @@ class boss_viscidus : public CreatureScript
                     _phase = PHASE_GLOB;
                     DoCast(me, SPELL_VISCIDUS_EXPLODE);
                     me->SetVisible(false);
+                    me->SetCanMelee(false);
                     me->RemoveAura(SPELL_TOXIN);
                     me->RemoveAura(SPELL_VISCIDUS_FREEZE);
 
@@ -224,6 +224,7 @@ class boss_viscidus : public CreatureScript
                     _phase = PHASE_FROST;
                     InitSpells();
                     me->SetVisible(true);
+                    me->SetCanMelee(true);
                 }
 
                 events.Update(diff);
@@ -248,9 +249,6 @@ class boss_viscidus : public CreatureScript
                             break;
                     }
                 }
-
-                if (_phase != PHASE_GLOB)
-                    DoMeleeAttackIfReady();
             }
 
         private:

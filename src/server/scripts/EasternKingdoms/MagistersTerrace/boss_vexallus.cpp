@@ -100,7 +100,7 @@ class boss_vexallus : public CreatureScript
                 summons.Summon(summoned);
             }
 
-            void DamageTaken(Unit* /*who*/, uint32& /*damage*/) override
+            void DamageTaken(Unit* /*who*/, uint32& /*damage*/, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
             {
                 if (_enraged)
                     return;
@@ -167,8 +167,6 @@ class boss_vexallus : public CreatureScript
                     if (me->HasUnitState(UNIT_STATE_CASTING))
                         return;
                 }
-
-                DoMeleeAttackIfReady();
             }
 
         private:

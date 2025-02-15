@@ -108,6 +108,7 @@ class npc_sc_millhouse_manastorm : public CreatureScript
                 _instance(creature->GetInstanceScript())
             {
                 events.SetPhase(PHASE_MILLHOUSE_GROUP_1);
+                me->SetCanMelee(false); // DoSpellAttackIfReady
             }
 
             void ScheduleEvents()
@@ -117,7 +118,7 @@ class npc_sc_millhouse_manastorm : public CreatureScript
                 events.ScheduleEvent(EVENT_FEAR, 8s);
             }
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
+            void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
             {
                 if (damage >= me->GetHealth())
                     damage = me->GetHealth() - 1;
@@ -160,7 +161,7 @@ class npc_sc_millhouse_manastorm : public CreatureScript
                         break;
                 }
 
-                me->AddUnitFlag(UNIT_FLAG_IN_COMBAT);
+                me->SetUnitFlag(UNIT_FLAG_IN_COMBAT);
             }
 
             void MovementInform(uint32 type, uint32 pointId) override
@@ -178,7 +179,7 @@ class npc_sc_millhouse_manastorm : public CreatureScript
                 switch (pointId)
                 {
                     case POINT_MILLHOUSE_GROUP_2:
-                        me->AddUnitFlag(UNIT_FLAG_IN_COMBAT);
+                        me->SetUnitFlag(UNIT_FLAG_IN_COMBAT);
                         me->SetReactState(REACT_AGGRESSIVE);
                         if (Creature* worldtrigger = me->FindNearestCreature(NPC_WORLDTRIGGER, 200.0f))
                             me->SetFacingToObject(worldtrigger);
@@ -187,7 +188,7 @@ class npc_sc_millhouse_manastorm : public CreatureScript
                         events.ScheduleEvent(EVENT_READY_FOR_COMBAT, 10s);
                         break;
                     case POINT_MILLHOUSE_GROUP_3:
-                        me->AddUnitFlag(UNIT_FLAG_IN_COMBAT);
+                        me->SetUnitFlag(UNIT_FLAG_IN_COMBAT);
                         me->SetReactState(REACT_AGGRESSIVE);
                         me->SetFacingTo(5.931499f);
                         DoCast(me, SPELL_ANCHOR_HERE);
@@ -278,8 +279,6 @@ class spell_force_of_earth : public SpellScriptLoader
 
         class spell_force_of_earth_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_force_of_earth_SpellScript);
-
             void DummyEffect(SpellEffIndex /*effIndex*/)
             {
                 GetCaster()->SetDisplayId(26693); // can be moved to SAI part, need sniffs to see what this dummy does (note: npc 43552)
@@ -305,8 +304,6 @@ class spell_sc_twilight_documents : public SpellScriptLoader
 
         class spell_sc_twilight_documents_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_sc_twilight_documents_SpellScript);
-
             bool Validate(SpellInfo const* /*spell*/) override
             {
                 if (!sObjectMgr->GetGameObjectTemplate(GAMEOBJECT_TWILIGHT_DOCUMENTS))
@@ -350,8 +347,6 @@ class spell_sc_quake : public SpellScriptLoader
 
         class spell_sc_quake_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_sc_quake_SpellScript);
-
             void FilterTargets(std::list<WorldObject*>& unitList)
             {
                 unitList.remove_if(JumpCheck());

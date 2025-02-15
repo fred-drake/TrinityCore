@@ -139,7 +139,7 @@ class boss_steelbreaker : public CreatureScript
 
         struct boss_steelbreakerAI : public BossAI
         {
-            boss_steelbreakerAI(Creature* creature) : BossAI(creature, BOSS_ASSEMBLY_OF_IRON)
+            boss_steelbreakerAI(Creature* creature) : BossAI(creature, DATA_ASSEMBLY_OF_IRON)
             {
                 Initialize();
             }
@@ -200,14 +200,14 @@ class boss_steelbreaker : public CreatureScript
             {
                 _JustDied();
 
-                if (instance->GetBossState(BOSS_ASSEMBLY_OF_IRON) == DONE)
+                if (instance->GetBossState(DATA_ASSEMBLY_OF_IRON) == DONE)
                 {
                     DoCastAOE(SPELL_KILL_CREDIT, true);
                     Talk(SAY_STEELBREAKER_ENCOUNTER_DEFEATED);
                 }
                 else
                 {
-                    me->SetLootRecipient(nullptr);
+                    me->SetTappedBy(nullptr);
                     Talk(SAY_STEELBREAKER_DEATH);
                     //DoCastAOE(SPELL_SUPERCHARGE, true);
 
@@ -269,8 +269,6 @@ class boss_steelbreaker : public CreatureScript
                     if (me->HasUnitState(UNIT_STATE_CASTING))
                         return;
                 }
-
-                DoMeleeAttackIfReady();
             }
         };
 
@@ -287,7 +285,7 @@ class boss_runemaster_molgeim : public CreatureScript
 
         struct boss_runemaster_molgeimAI : public BossAI
         {
-            boss_runemaster_molgeimAI(Creature* creature) : BossAI(creature, BOSS_ASSEMBLY_OF_IRON)
+            boss_runemaster_molgeimAI(Creature* creature) : BossAI(creature, DATA_ASSEMBLY_OF_IRON)
             {
                 Initialize();
             }
@@ -348,14 +346,14 @@ class boss_runemaster_molgeim : public CreatureScript
             {
                 _JustDied();
 
-                if (instance->GetBossState(BOSS_ASSEMBLY_OF_IRON) == DONE)
+                if (instance->GetBossState(DATA_ASSEMBLY_OF_IRON) == DONE)
                 {
                     DoCastAOE(SPELL_KILL_CREDIT, true);
                     Talk(SAY_MOLGEIM_ENCOUNTER_DEFEATED);
                 }
                 else
                 {
-                    me->SetLootRecipient(nullptr);
+                    me->SetTappedBy(nullptr);
                     Talk(SAY_MOLGEIM_DEATH);
                     //DoCastAOE(SPELL_SUPERCHARGE, true);
 
@@ -437,8 +435,6 @@ class boss_runemaster_molgeim : public CreatureScript
                     if (me->HasUnitState(UNIT_STATE_CASTING))
                         return;
                 }
-
-                DoMeleeAttackIfReady();
             }
         };
 
@@ -455,7 +451,7 @@ class boss_stormcaller_brundir : public CreatureScript
 
         struct boss_stormcaller_brundirAI : public BossAI
         {
-            boss_stormcaller_brundirAI(Creature* creature) : BossAI(creature, BOSS_ASSEMBLY_OF_IRON)
+            boss_stormcaller_brundirAI(Creature* creature) : BossAI(creature, DATA_ASSEMBLY_OF_IRON)
             {
                 Initialize();
             }
@@ -527,14 +523,14 @@ class boss_stormcaller_brundir : public CreatureScript
             {
                 _JustDied();
 
-                if (instance->GetBossState(BOSS_ASSEMBLY_OF_IRON) == DONE)
+                if (instance->GetBossState(DATA_ASSEMBLY_OF_IRON) == DONE)
                 {
                     DoCastAOE(SPELL_KILL_CREDIT, true);
                     Talk(SAY_BRUNDIR_ENCOUNTER_DEFEATED);
                 }
                 else
                 {
-                    me->SetLootRecipient(nullptr);
+                    me->SetTappedBy(nullptr);
                     Talk(SAY_BRUNDIR_DEATH);
                     //DoCastAOE(SPELL_SUPERCHARGE, true);
 
@@ -652,8 +648,6 @@ class boss_stormcaller_brundir : public CreatureScript
                     if (me->HasUnitState(UNIT_STATE_CASTING))
                         return;
                 }
-
-                DoMeleeAttackIfReady();
             }
 
             private:
@@ -673,8 +667,6 @@ class spell_shield_of_runes : public SpellScriptLoader
 
         class spell_shield_of_runes_AuraScript : public AuraScript
         {
-            PrepareAuraScript(spell_shield_of_runes_AuraScript);
-
             void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
             {
                 if (Unit* caster = GetCaster())
@@ -701,8 +693,6 @@ class spell_assembly_meltdown : public SpellScriptLoader
 
         class spell_assembly_meltdown_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_assembly_meltdown_SpellScript);
-
             void HandleInstaKill(SpellEffIndex /*effIndex*/)
             {
                 if (InstanceScript* instance = GetCaster()->GetInstanceScript())
@@ -729,8 +719,6 @@ class spell_assembly_rune_of_summoning : public SpellScriptLoader
 
         class spell_assembly_rune_of_summoning_AuraScript : public AuraScript
         {
-            PrepareAuraScript(spell_assembly_rune_of_summoning_AuraScript);
-
             bool Validate(SpellInfo const* /*spell*/) override
             {
                 return ValidateSpellInfo({ SPELL_RUNE_OF_SUMMONING_SUMMON });

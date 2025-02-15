@@ -24,7 +24,6 @@ EndScriptData */
 
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
-#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "temple_of_ahnqiraj.h"
 #include "TemporarySummon.h"
@@ -83,7 +82,6 @@ public:
             _Reset();
         }
 
-
         void JustDied(Unit* /*killer*/) override
         {
             if (instance->GetData(DATA_BUG_TRIO_DEATH) < 2)// Unlootable if death
@@ -130,8 +128,6 @@ public:
                     Check_Timer = 2000;
                 } else Check_Timer -=diff;
             }
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -217,8 +213,6 @@ public:
                 DoCast(me, SPELL_ENRAGE);
                 Enraged = true;
             } else Charge_Timer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -325,8 +319,6 @@ public:
                 }
                 Check_Timer = 2000;
             } else Check_Timer -= diff;
-
-            DoMeleeAttackIfReady();
         }
     };
 

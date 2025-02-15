@@ -84,11 +84,12 @@ enum LfgState : uint8
 
 enum LfgQueueType
 {
-    LFG_QUEUE_DUNGEON   = 1,
-    LFG_QUEUE_LFR       = 2,
-    LFG_QUEUE_SCENARIO  = 3,
-    LFG_QUEUE_FLEX      = 4,
-    LFG_QUEUE_WORLD_PVP = 5
+    LFG_QUEUE_DUNGEON       = 1,
+    LFG_QUEUE_LFR           = 2,
+    LFG_QUEUE_SCENARIO      = 3,
+    LFG_QUEUE_FLEX          = 4,
+    LFG_QUEUE_WORLD_PVP     = 5,
+    LFG_QUEUE_SCHEDULED_PVP = 6,    // pvp brawl
 };
 
 /// Instance lock types
@@ -137,6 +138,10 @@ typedef std::map<ObjectGuid, ObjectGuid> LfgGroupsMap;
 TC_GAME_API std::string ConcatenateDungeons(LfgDungeonSet const& dungeons);
 TC_GAME_API std::string GetRolesString(uint8 roles);
 TC_GAME_API std::string GetStateString(LfgState state);
+
+// allow implicit enum to int conversions for formatting
+inline int32 format_as(LfgUpdateType e) { return e; }
+inline uint8 format_as(LfgState e) { return e; }
 
 } // namespace lfg
 

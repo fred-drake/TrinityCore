@@ -18,6 +18,7 @@
 #ifndef CombatLogPacketsCommon_h__
 #define CombatLogPacketsCommon_h__
 
+#include "ObjectGuid.h"
 #include "Packet.h"
 
 class Spell;
@@ -29,9 +30,9 @@ namespace WorldPackets
     {
         struct SpellLogPowerData
         {
-            SpellLogPowerData(int32 powerType, int32 amount, int32 cost) : PowerType(powerType), Amount(amount), Cost(cost) { }
+            SpellLogPowerData(int8 powerType, int32 amount, int32 cost) : PowerType(powerType), Amount(amount), Cost(cost) { }
 
-            int32 PowerType = 0;
+            int8 PowerType = 0;
             int32 Amount = 0;
             int32 Cost = 0;
         };
@@ -42,6 +43,8 @@ namespace WorldPackets
             int32 AttackPower = 0;
             int32 SpellPower = 0;
             int32 Armor = 0;
+            int32 Unknown_1105_1 = 0;
+            int32 Unknown_1105_2 = 0;
             std::vector<SpellLogPowerData> PowerData;
 
             void Initialize(Unit const* unit);
@@ -69,13 +72,14 @@ namespace WorldPackets
             int16 PlayerLevelDelta = 0;
             float PlayerItemLevel = 0;
             float TargetItemLevel = 0;
-            uint16 ScalingHealthItemLevelCurveID = 0;
+            uint32 ScalingHealthItemLevelCurveID = 0;
             uint8 TargetLevel = 0;
             uint8 Expansion = 0;
             int8 TargetScalingLevelDelta = 0;
             uint32 Flags = NO_LEVEL_SCALING | NO_ITEM_LEVEL_SCALING;
             int32 PlayerContentTuningID = 0;
             int32 TargetContentTuningID = 0;
+            int32 Unused927 = 0;
 
             template<class T, class U>
             bool GenerateDataForUnits(T* attacker, U* target);
@@ -87,10 +91,19 @@ namespace WorldPackets
             int32 ScriptVisualID = 0;
         };
 
+        struct SpellSupportInfo
+        {
+            ObjectGuid Supporter;
+            int32 SupportSpellID = 0;
+            int32 AmountRaw = 0;
+            float AmountPortion = 0.0f;
+        };
+
         ByteBuffer& operator<<(ByteBuffer& data, SpellCastLogData const& spellCastLogData);
         ByteBuffer& operator<<(ByteBuffer& data, ContentTuningParams const& contentTuningParams);
         ByteBuffer& operator>>(ByteBuffer& data, SpellCastVisual& visual);
         ByteBuffer& operator<<(ByteBuffer& data, SpellCastVisual const& visual);
+        ByteBuffer& operator<<(ByteBuffer& data, SpellSupportInfo const& supportInfo);
     }
 
     namespace CombatLog

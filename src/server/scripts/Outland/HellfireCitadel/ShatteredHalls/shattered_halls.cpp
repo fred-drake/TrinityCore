@@ -170,8 +170,6 @@ class boss_shattered_executioner : public CreatureScript
                 }
                 else
                     cleaveTimer -= diff;
-
-                DoMeleeAttackIfReady();
             }
         private:
             uint32 cleaveTimer;
@@ -183,6 +181,7 @@ class boss_shattered_executioner : public CreatureScript
         }
 };
 
+// 39288, 39289, 39290 - Kargath's Executioner
 class spell_kargath_executioner : public SpellScriptLoader
 {
     public:
@@ -190,8 +189,6 @@ class spell_kargath_executioner : public SpellScriptLoader
 
         class spell_kargath_executioner_AuraScript : public AuraScript
         {
-            PrepareAuraScript(spell_kargath_executioner_AuraScript);
-
             bool AreaCheck(Unit* target)
             {
                 if (target->GetMap()->GetId() != 540)
@@ -217,6 +214,7 @@ class spell_kargath_executioner : public SpellScriptLoader
         }
 };
 
+// 39291 - Remove Kargath's Executioner
 class spell_remove_kargath_executioner : public SpellScriptLoader
 {
     public:
@@ -224,8 +222,6 @@ class spell_remove_kargath_executioner : public SpellScriptLoader
 
         class spell_remove_kargath_executioner_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_remove_kargath_executioner_SpellScript);
-
             void HandleScript(SpellEffIndex /*effIndex*/)
             {
                 Unit* target = GetCaster();

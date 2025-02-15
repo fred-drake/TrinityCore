@@ -187,28 +187,28 @@ public:
             switch (uiType)
             {
                 case 1:
-                    AddWaypoint(0, 747.36f, 634.07f, 411.572f);
-                    AddWaypoint(1, 780.43f, 607.15f, 411.82f);
-                    AddWaypoint(2, 785.99f, 599.41f, 411.92f);
-                    AddWaypoint(3, 778.44f, 601.64f, 411.79f);
+                    AddWaypoint(0, 747.36f, 634.07f, 411.572f, true);
+                    AddWaypoint(1, 780.43f, 607.15f, 411.82f, true);
+                    AddWaypoint(2, 785.99f, 599.41f, 411.92f, true);
+                    AddWaypoint(3, 778.44f, 601.64f, 411.79f, true);
                     uiWaypointPath = 1;
                     break;
                 case 2:
-                    AddWaypoint(0, 747.35f, 634.07f, 411.57f);
-                    AddWaypoint(1, 768.72f, 581.01f, 411.92f);
-                    AddWaypoint(2, 763.55f, 590.52f, 411.71f);
+                    AddWaypoint(0, 747.35f, 634.07f, 411.57f, true);
+                    AddWaypoint(1, 768.72f, 581.01f, 411.92f, true);
+                    AddWaypoint(2, 763.55f, 590.52f, 411.71f, true);
                     uiWaypointPath = 2;
                     break;
                 case 3:
-                    AddWaypoint(0, 747.35f, 634.07f, 411.57f);
-                    AddWaypoint(1, 784.02f, 645.33f, 412.39f);
-                    AddWaypoint(2, 775.67f, 641.91f, 411.91f);
+                    AddWaypoint(0, 747.35f, 634.07f, 411.57f, true);
+                    AddWaypoint(1, 784.02f, 645.33f, 412.39f, true);
+                    AddWaypoint(2, 775.67f, 641.91f, 411.91f, true);
                     uiWaypointPath = 3;
                     break;
             }
 
             if (uiType <= 3)
-                Start(false, true);
+                Start(false);
         }
 
         void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
@@ -296,8 +296,6 @@ public:
                 }
                 uiShieldBreakerTimer = 7000;
             }else uiShieldBreakerTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
     };
 
@@ -328,7 +326,7 @@ public:
 
             me->SetReactState(REACT_PASSIVE);
             // THIS IS A HACK, SHOULD BE REMOVED WHEN THE EVENT IS FULL SCRIPTED
-            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetImmuneToPC(true);
         }
 
@@ -429,13 +427,11 @@ public:
                 DoCastVictim(SPELL_MORTAL_STRIKE);
                 uiMortalStrikeTimer = urand(8000, 12000);
             } else uiMortalStrikeTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
         {
-            instance->SetData(BOSS_GRAND_CHAMPIONS, DONE);
+            instance->SetBossState(BOSS_GRAND_CHAMPIONS, DONE);
         }
     };
 
@@ -466,7 +462,7 @@ public:
 
             me->SetReactState(REACT_PASSIVE);
             // THIS IS A HACK, SHOULD BE REMOVED WHEN THE EVENT IS FULL SCRIPTED
-            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetImmuneToPC(true);
         }
 
@@ -522,7 +518,7 @@ public:
                 else if (me->GetGUID() == instance->GetGuidData(DATA_GRAND_CHAMPION_3))
                     me->SetHomePosition(754.34f, 660.70f, 412.39f, 4.79f);
 
-                instance->SetData(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
+                instance->SetBossState(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
 
                 EnterEvadeMode();
                 bHome = true;
@@ -573,13 +569,11 @@ public:
                 DoCast(me, SPELL_HASTE);
                 uiHasteTimer = 22000;
             } else uiHasteTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
         {
-            instance->SetData(BOSS_GRAND_CHAMPIONS, DONE);
+            instance->SetBossState(BOSS_GRAND_CHAMPIONS, DONE);
         }
     };
 
@@ -610,7 +604,7 @@ public:
 
             me->SetReactState(REACT_PASSIVE);
             // THIS IS A HACK, SHOULD BE REMOVED WHEN THE EVENT IS FULL SCRIPTED
-            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetImmuneToPC(true);
         }
 
@@ -672,7 +666,7 @@ public:
                 else if (me->GetGUID() == instance->GetGuidData(DATA_GRAND_CHAMPION_3))
                     me->SetHomePosition(754.34f, 660.70f, 412.39f, 4.79f);
 
-                instance->SetData(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
+                instance->SetBossState(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
 
                 EnterEvadeMode();
                 bHome = true;
@@ -725,13 +719,11 @@ public:
 
                 uiHexMendingTimer = urand(20000, 25000);
             } else uiHexMendingTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
         {
-            instance->SetData(BOSS_GRAND_CHAMPIONS, DONE);
+            instance->SetBossState(BOSS_GRAND_CHAMPIONS, DONE);
         }
     };
 
@@ -762,7 +754,7 @@ public:
 
             me->SetReactState(REACT_PASSIVE);
             // THIS IS A HACK, SHOULD BE REMOVED WHEN THE EVENT IS FULL SCRIPTED
-            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetImmuneToPC(true);
         }
 
@@ -823,7 +815,7 @@ public:
                 else if (me->GetGUID() == instance->GetGuidData(DATA_GRAND_CHAMPION_3))
                     me->SetHomePosition(754.34f, 660.70f, 412.39f, 4.79f);
 
-                instance->SetData(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
+                instance->SetBossState(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
 
                 EnterEvadeMode();
                 bHome = true;
@@ -886,13 +878,11 @@ public:
                 }
                 bShoot = false;
             } else uiMultiShotTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
         {
-            instance->SetData(BOSS_GRAND_CHAMPIONS, DONE);
+            instance->SetBossState(BOSS_GRAND_CHAMPIONS, DONE);
         }
     };
 
@@ -923,7 +913,7 @@ public:
 
             me->SetReactState(REACT_PASSIVE);
             // THIS IS A HACK, SHOULD BE REMOVED WHEN THE EVENT IS FULL SCRIPTED
-            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetImmuneToPC(true);
         }
 
@@ -976,7 +966,7 @@ public:
                 else if (me->GetGUID() == instance->GetGuidData(DATA_GRAND_CHAMPION_3))
                     me->SetHomePosition(754.34f, 660.70f, 412.39f, 4.79f);
 
-                instance->SetData(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
+                instance->SetBossState(BOSS_GRAND_CHAMPIONS, IN_PROGRESS);
 
                 EnterEvadeMode();
                 bHome = true;
@@ -1012,13 +1002,11 @@ public:
                     DoCast(target, SPELL_POISON_BOTTLE);
                 uiPosionBottleTimer = 19000;
             } else uiPosionBottleTimer -= uiDiff;
-
-            DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/) override
         {
-            instance->SetData(BOSS_GRAND_CHAMPIONS, DONE);
+            instance->SetBossState(BOSS_GRAND_CHAMPIONS, DONE);
         }
     };
 

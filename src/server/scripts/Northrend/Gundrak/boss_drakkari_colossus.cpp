@@ -45,7 +45,11 @@ enum Spells
     SPELL_FREEZE_ANIM                             = 16245,
     SPELL_MOJO_PUDDLE                             = 55627,
     SPELL_MOJO_WAVE                               = 55626,
+    SPELL_MORTAL_STRIKES_NORMAL                   = 54715,
+    SPELL_MORTAL_STRIKES_HEROIC                   = 59454
 };
+
+#define SPELL_MORTAL_STRIKES DUNGEON_MODE<uint32>(SPELL_MORTAL_STRIKES_NORMAL, SPELL_MORTAL_STRIKES_HEROIC)
 
 enum ColossusEvents
 {
@@ -110,6 +114,8 @@ struct boss_drakkari_colossus : public BossAI
         events.ScheduleEvent(EVENT_MIGHTY_BLOW, 10s, 30s);
 
         Initialize();
+
+        DoCastSelf(SPELL_MORTAL_STRIKES, true);
     }
 
     void JustEngagedWith(Unit* who) override
@@ -153,7 +159,7 @@ struct boss_drakkari_colossus : public BossAI
         }
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& damage) override
+    void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (me->IsImmuneToPC())
             damage = 0;
@@ -210,9 +216,6 @@ struct boss_drakkari_colossus : public BossAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        if (me->GetReactState() == REACT_AGGRESSIVE)
-            DoMeleeAttackIfReady();
     }
 
     void JustSummoned(Creature* summon) override
@@ -277,8 +280,6 @@ struct boss_drakkari_elemental : public ScriptedAI
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
         }
-
-        DoMeleeAttackIfReady();
     }
 
    void DoAction(int32 action) override
@@ -295,7 +296,7 @@ struct boss_drakkari_elemental : public ScriptedAI
         }
    }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& damage) override
+    void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*damageType*/, SpellInfo const* /*spellInfo = nullptr*/) override
     {
         if (HealthBelowPct(50))
         {
@@ -433,10 +434,7 @@ struct npc_living_mojo : public ScriptedAI
         if (!UpdateVictim())
             return;
 
-        _scheduler.Update(diff, [this]
-        {
-            DoMeleeAttackIfReady();
-        });
+        _scheduler.Update(diff);
     }
 
 private:
@@ -446,7 +444,7 @@ private:
 
 void AddSC_boss_drakkari_colossus()
 {
-    RegisterCreatureAIWithFactory(boss_drakkari_colossus, GetGundrakAI);
-    RegisterCreatureAIWithFactory(boss_drakkari_elemental, GetGundrakAI);
-    RegisterCreatureAIWithFactory(npc_living_mojo, GetGundrakAI);
+    RegisterGundrakCreatureAI(boss_drakkari_colossus);
+    RegisterGundrakCreatureAI(boss_drakkari_elemental);
+    RegisterGundrakCreatureAI(npc_living_mojo);
 }

@@ -30,11 +30,26 @@ uint32 const DragonspireMobs[3] = { NPC_BLACKHAND_DREADWEAVER, NPC_BLACKHAND_SUM
 
 DoorData const doorData[] =
 {
-    { GO_DOORS,                 DATA_PYROGAURD_EMBERSEER,   DOOR_TYPE_ROOM },
-    { GO_EMBERSEER_OUT,         DATA_PYROGAURD_EMBERSEER,   DOOR_TYPE_PASSAGE },
-    { GO_DRAKKISATH_DOOR_1,     DATA_GENERAL_DRAKKISATH,    DOOR_TYPE_PASSAGE },
-    { GO_DRAKKISATH_DOOR_2,     DATA_GENERAL_DRAKKISATH,    DOOR_TYPE_PASSAGE },
-    { 0,                        0,                          DOOR_TYPE_ROOM }
+    { GO_DOORS,                  DATA_PYROGAURD_EMBERSEER,     EncounterDoorBehavior::OpenWhenNotInProgress },
+    { GO_EMBERSEER_OUT,          DATA_PYROGAURD_EMBERSEER,     EncounterDoorBehavior::OpenWhenDone },
+    { GO_DRAKKISATH_DOOR_1,      DATA_GENERAL_DRAKKISATH,      EncounterDoorBehavior::OpenWhenDone },
+    { GO_DRAKKISATH_DOOR_2,      DATA_GENERAL_DRAKKISATH,      EncounterDoorBehavior::OpenWhenDone },
+    { GO_PORTCULLIS_ACTIVE,      DATA_WARCHIEF_REND_BLACKHAND, EncounterDoorBehavior::OpenWhenDone },
+    { GO_PORTCULLIS_TOBOSSROOMS, DATA_WARCHIEF_REND_BLACKHAND, EncounterDoorBehavior::OpenWhenDone },
+    { 0,                         0,                            EncounterDoorBehavior::OpenWhenNotInProgress }
+};
+
+static constexpr DungeonEncounterData Encounters[] =
+{
+    { DATA_HIGHLORD_OMOKK, { { 267 } } },
+    { DATA_SHADOW_HUNTER_VOSHGAJIN, { { 268 } } },
+    { DATA_WARMASTER_VOONE, { { 269 } } },
+    { DATA_MOTHER_SMOLDERWEB, { { 270 } } },
+    { DATA_UROK_DOOMHOWL, { { 271 } } },
+    { DATA_QUARTERMASTER_ZIGRIS, { { 272 } } },
+    { DATA_HALYCON, { { 274 } } },
+    { DATA_GIZRUL_THE_SLAVENER, { { 273 } } },
+    { DATA_OVERLORD_WYRMTHALAK, { { 275 } } },
 };
 
 enum EventIds
@@ -60,6 +75,7 @@ public:
         {
             SetHeaders(DataHeader);
             SetBossNumber(EncounterCount);
+            LoadDungeonEncounterData(Encounters);
             LoadDoorData(doorData);
         }
 
@@ -412,11 +428,10 @@ public:
 
         void Dragonspireroomstore()
         {
-            uint8 creatureCount;
-
             for (uint8 i = 0; i < 7; ++i)
             {
-                creatureCount = 0;
+                // Refresh the creature list
+                runecreaturelist[i].clear();
 
                 if (GameObject* rune = instance->GetGameObject(go_roomrunes[i]))
                 {
@@ -427,10 +442,7 @@ public:
                         for (std::list<Creature*>::iterator itr = creatureList.begin(); itr != creatureList.end(); ++itr)
                         {
                             if (Creature* creature = *itr)
-                            {
-                                runecreaturelist[i][creatureCount] = creature->GetGUID();
-                                ++creatureCount;
-                            }
+                                runecreaturelist[i].push_back(creature->GetGUID());
                         }
                     }
                 }
@@ -451,9 +463,9 @@ public:
 
                 if (rune->GetGoState() == GO_STATE_ACTIVE)
                 {
-                    for (uint8 ii = 0; ii < 5; ++ii)
+                    for (ObjectGuid const& guid : runecreaturelist[i])
                     {
-                        mob = instance->GetCreature(runecreaturelist[i][ii]);
+                        mob = instance->GetCreature(guid);
                         if (mob && mob->IsAlive())
                             _mobAlive = true;
                     }
@@ -528,7 +540,7 @@ public:
             ObjectGuid go_blackrockaltar;
             ObjectGuid go_roomrunes[7];
             ObjectGuid go_emberseerrunes[7];
-            ObjectGuid runecreaturelist[7][5];
+            GuidVector runecreaturelist[7];
             ObjectGuid go_portcullis_active;
             ObjectGuid go_portcullis_tobossrooms;
             GuidList _incarceratorList;
